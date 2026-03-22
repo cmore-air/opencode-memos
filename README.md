@@ -14,11 +14,17 @@ curl -fsSL https://raw.githubusercontent.com/cmore-air/opencode-memos/main/insta
 
 ### Windows
 
-```batch
-irm https://raw.githubusercontent.com/cmore-air/opencode-memos/main/install.bat | iex
+**PowerShell** (recommended):
+```powershell
+irm https://raw.githubusercontent.com/cmore-air/opencode-memos/main/install.ps1 | iex
 ```
 
-Or download and run `install.bat` manually.
+**CMD** (alternative):
+```batch
+irm https://raw.githubusercontent.com/cmore-air/opencode-memos/main/install.bat | cmd
+```
+
+Or download and run the script manually.
 
 Both scripts will:
 1. Download and install the plugin to `~/.config/opencode/plugins/opencode-memos`
