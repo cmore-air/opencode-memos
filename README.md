@@ -6,13 +6,21 @@ Your agent will remember everything you tell it — across sessions, across proj
 
 ## Installation
 
-### One-line install
+### Linux / macOS
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/cmore-air/opencode-memos/main/install.sh | bash
 ```
 
-This will:
+### Windows
+
+```batch
+irm https://raw.githubusercontent.com/cmore-air/opencode-memos/main/install.bat | iex
+```
+
+Or download and run `install.bat` manually.
+
+Both scripts will:
 1. Download and install the plugin to `~/.config/opencode/plugins/opencode-memos`
 2. Register the plugin in OpenCode config
 3. Create the `/mem-os-init` and `/mem-os-help` commands
