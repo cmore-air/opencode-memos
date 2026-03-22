@@ -6,13 +6,18 @@ Your agent will remember everything you tell it — across sessions, across proj
 
 ## Installation
 
-### Step 1: Install the plugin
+### One-line install
 
 ```bash
-bunx opencode-memos@latest install
+curl -fsSL https://raw.githubusercontent.com/cmore-air/opencode-memos/main/install.sh | bash
 ```
 
-### Step 2: Configure environment variables
+This will:
+1. Download and install the plugin to `~/.config/opencode/plugins/opencode-memos`
+2. Register the plugin in OpenCode config
+3. Create the `/mem-os-init` and `/mem-os-help` commands
+
+### Configure environment variables
 
 Get your API key from [MemOS Dashboard](https://memos-dashboard.openmem.net/apikeys/), then set:
 
@@ -77,11 +82,13 @@ Optional:
 ## Development
 
 ```bash
+git clone https://github.com/cmore-air/opencode-memos
+cd opencode-memos
 bun install
 bun run build
 ```
 
-Local installation:
+To test your local changes, update the plugin path in `~/.config/opencode/opencode.jsonc`:
 
 ```jsonc
 {
