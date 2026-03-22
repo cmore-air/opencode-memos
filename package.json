@@ -38,7 +38,8 @@
     "type": "plugin",
     "hooks": [
       "chat.message",
-      "event"
+      "event",
+      "experimental.chat.messages.transform"
     ]
   },
   "files": [

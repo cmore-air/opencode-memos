@@ -158,6 +158,77 @@ export const MemOSPlugin: Plugin = async (_ctx: PluginInput) => {
       }
     },
 
+    "experimental.chat.messages.transform": async (_input, output) => {
+      if (!isConfigured()) return;
+
+      try {
+        const messages = output.messages;
+        if (messages.length === 0) {
+          log("experimental.chat.messages.transform: no messages");
+          return;
+        }
+
+        const lastUserMessageIdx = [...messages].reverse().findIndex(
+          (m) => m.info?.role === "user"
+        );
+        if (lastUserMessageIdx === -1) {
+          log("experimental.chat.messages.transform: no user message found");
+          return;
+        }
+        const userMsgIdx = messages.length - 1 - lastUserMessageIdx;
+        const userMessage = messages[userMsgIdx]!;
+        const firstMessage = messages[0]!;
+
+        const textParts = userMessage.parts.filter(
+          (p): p is Part & { type: "text"; text: string } => p.type === "text"
+        );
+        if (textParts.length === 0) {
+          log("experimental.chat.messages.transform: no text parts in user message");
+          return;
+        }
+
+        const userText = textParts.map((p) => p.text).join("\n");
+        const queryForSearch = userText.slice(0, MAX_QUERY_LENGTH);
+
+        const sessionID = firstMessage.info?.sessionID;
+        const tags = getTags(sessionID || "");
+        const { conversationId } = tags;
+
+        log("experimental.chat.messages.transform: searching memories", {
+          queryPreview: queryForSearch.slice(0, 100),
+          conversationId,
+        });
+
+        const searchResult = await memOSClient.searchMemory(queryForSearch, conversationId);
+        const memoryContext = formatContextForPrompt(
+          searchResult.success && searchResult.data ? searchResult.data : null
+        );
+
+        if (!memoryContext) {
+          log("experimental.chat.messages.transform: no memory context found");
+          return;
+        }
+
+        const truncatedContext = memoryContext.slice(0, MAX_CONTEXT_LENGTH);
+        const contextPart: Part = {
+          id: `prt-memos-context-${Date.now()}`,
+          sessionID: firstMessage.info?.sessionID,
+          messageID: firstMessage.info?.id,
+          type: "text",
+          text: truncatedContext,
+          synthetic: true,
+        };
+
+        firstMessage.parts.unshift(contextPart);
+
+        log("experimental.chat.messages.transform: context injected into first message", {
+          contextLength: truncatedContext.length,
+        });
+      } catch (error) {
+        log("experimental.chat.messages.transform: ERROR", { error: String(error) });
+      }
+    },
+
     tool: {
       "mem-os": tool({
         description:
