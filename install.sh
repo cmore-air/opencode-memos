@@ -39,9 +39,8 @@ else
     echo "Warning: bun not found, skipping build. Install bun first."
 fi
 
-# Register plugin in opencode.jsonc
+# Register plugin in opencode.json
 mkdir -p "$OPENCODE_CONFIG_DIR"
-PLUGIN_PATH="file://$INSTALL_DIR"
 
 if [ -f "$OPENCODE_CONFIG" ]; then
     if grep -q "opencode-memos" "$OPENCODE_CONFIG"; then
@@ -50,8 +49,10 @@ if [ -f "$OPENCODE_CONFIG" ]; then
         node -e "
 const fs = require('fs');
 const path = require('path');
-const content = fs.readFileSync('$OPENCODE_CONFIG', 'utf8');
-const pluginPath = '$PLUGIN_PATH';
+const configPath = '$OPENCODE_CONFIG';
+const installDir = path.resolve('$INSTALL_DIR');
+const pluginPath = 'file://' + installDir.replace(/\\\\/g, '/').replace(/:/, '');
+const content = fs.readFileSync(configPath, 'utf8');
 let config;
 try {
   const stripped = content.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
@@ -63,13 +64,19 @@ if (!config.plugin) config.plugin = [];
 if (!config.plugin.includes(pluginPath)) {
   config.plugin.push(pluginPath);
 }
-fs.writeFileSync('$OPENCODE_CONFIG', JSON.stringify(config, null, 2));
-console.log('Added plugin to config');
+fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+console.log('Added plugin to config:', pluginPath);
 "
     fi
 else
-    echo '{"plugin": ["'"$PLUGIN_PATH"'"]}' > "$OPENCODE_CONFIG"
-    echo "Created config with plugin"
+    node -e "
+const fs = require('fs');
+const path = require('path');
+const installDir = path.resolve('$INSTALL_DIR');
+const pluginPath = 'file://' + installDir.replace(/\\\\/g, '/').replace(/:/, '');
+fs.writeFileSync('$OPENCODE_CONFIG', JSON.stringify({ plugin: [pluginPath] }, null, 2));
+console.log('Created config with plugin:', pluginPath);
+"
 fi
 
 # Create commands

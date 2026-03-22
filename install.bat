@@ -42,20 +42,33 @@ if exist "bun.exe" (
     echo Warning: bun not found, skipping build. Install bun first.
 )
 
-:: Register plugin in opencode.jsonc
+:: Register plugin using PowerShell for reliable JSON handling
 set PLUGIN_PATH=file:///%INSTALL_DIR%
 set PLUGIN_PATH=%PLUGIN_PATH:\=/%
 
-if exist "%OPENCODE_CONFIG%" (
-    findstr /C:"opencode-memos" "%OPENCODE_CONFIG%" >nul 2>&1
-    if not errorlevel 1 (
-        echo Plugin already registered in config
-    ) else (
-        node -e "const fs=require('fs');const c=fs.readFileSync('%OPENCODE_CONFIG%','utf8');let j;try{j=JSON.parse(c.replace(/\/\/.*$/gm,'').replace(/\/\*[\s\S]*?\*\//g,''));}catch{j={};}if(!j.plugin)j.plugin=[];if(!j.plugin.includes('%PLUGIN_PATH%'))j.plugin.push('%PLUGIN_PATH%');fs.writeFileSync('%OPENCODE_CONFIG%',JSON.stringify(j,null,2));console.log('Added plugin to config');"
-    )
-) else (
-    node -e "const fs=require('fs');fs.writeFileSync('%OPENCODE_CONFIG%',JSON.stringify({plugin:['%PLUGIN_PATH%']},null,2));console.log('Created config with plugin');"
-)
+powershell -NoProfile -ExecutionPolicy Bypass -Command "
+$configPath = '%OPENCODE_CONFIG%'
+$pluginPath = '%PLUGIN_PATH%'
+if (Test-Path $configPath) {
+    if (Select-String -Path $configPath -Pattern 'opencode-memos' -Quiet) {
+        Write-Host 'Plugin already registered in config'
+    } else {
+        try {
+            $content = Get-Content $configPath -Raw
+            $config = $content -replace '(?m)^\s*//.*$','' -replace '(?s)/\*.*?\*/','' | ConvertFrom-Json
+            if (-not $config.plugin) { $config | Add-Member -NotePropertyName 'plugin' -NotePropertyValue @() -Force }
+            if (-not ($config.plugin -contains $pluginPath)) { $config.plugin += $pluginPath }
+            $config | ConvertTo-Json -Depth 10 | Set-Content $configPath
+            Write-Host 'Added plugin to config'
+        } catch {
+            Write-Host 'Failed to update config'
+        }
+    }
+} else {
+    @{{ plugin = @($pluginPath) }} | ConvertTo-Json | Set-Content $configPath
+    Write-Host 'Created config with plugin'
+}
+"
 
 :: Create commands
 echo --- > "%COMMAND_DIR%\mem-os-init.md"
