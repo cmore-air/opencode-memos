@@ -5,8 +5,17 @@ PLUGIN_NAME="opencode-memos"
 REPO="cmore-air/opencode-memos"
 INSTALL_DIR="$HOME/.config/opencode/plugins/opencode-memos"
 OPENCODE_CONFIG_DIR="$HOME/.config/opencode"
-OPENCODE_CONFIG="$OPENCODE_CONFIG_DIR/opencode.jsonc"
+OPENCODE_CONFIG_JSON="$OPENCODE_CONFIG_DIR/opencode.json"
+OPENCODE_CONFIG_JSONC="$OPENCODE_CONFIG_DIR/opencode.jsonc"
 COMMAND_DIR="$OPENCODE_CONFIG_DIR/command"
+
+if [ -f "$OPENCODE_CONFIG_JSON" ]; then
+    OPENCODE_CONFIG="$OPENCODE_CONFIG_JSON"
+elif [ -f "$OPENCODE_CONFIG_JSONC" ]; then
+    OPENCODE_CONFIG="$OPENCODE_CONFIG_JSONC"
+else
+    OPENCODE_CONFIG="$OPENCODE_CONFIG_JSON"
+fi
 
 echo "Installing opencode-memos plugin..."
 

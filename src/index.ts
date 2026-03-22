@@ -12,6 +12,8 @@ import type { MemOSToolArgs } from "./types/index.js";
 
 const CODE_BLOCK_PATTERN = /```[\s\S]*?```/g;
 const INLINE_CODE_PATTERN = /`[^`]+`/g;
+const MAX_QUERY_LENGTH = 500;
+const MAX_CONTEXT_LENGTH = 2000;
 
 const MEMORY_KEYWORD_PATTERN = new RegExp(`\\b(${CONFIG.keywordPatterns.join("|")})\\b`, "i");
 
@@ -67,10 +69,10 @@ export const MemOSPlugin: Plugin = async (_ctx: PluginInput) => {
           textPartsCount: textParts.length,
         });
 
-        if (detectMemoryKeyword(userMessage)) {
+          if (detectMemoryKeyword(userMessage)) {
           log("chat.message: memory keyword detected");
           const nudgePart: Part = {
-            id: `mem-os-nudge-${Date.now()}`,
+            id: `prt-memos-nudge-${Date.now()}`,
             sessionID: input.sessionID,
             messageID: output.message.id,
             type: "text",
@@ -85,21 +87,23 @@ export const MemOSPlugin: Plugin = async (_ctx: PluginInput) => {
         const { conversationId } = tags;
 
         const isFirstMessage = !output.parts.some(
-          (p) => p.type === "text" && (p as any).synthetic && (p as any).id?.startsWith("mem-os-context-")
+          (p) => p.type === "text" && (p as any).synthetic && (p as any).id?.startsWith("prt-memos-context-")
         );
 
         if (isFirstMessage) {
-          const searchResult = await memOSClient.searchMemory(userMessage, conversationId);
+          const queryForSearch = userMessage.slice(0, MAX_QUERY_LENGTH);
+          const searchResult = await memOSClient.searchMemory(queryForSearch, conversationId);
 
           const memoryContext = formatContextForPrompt(searchResult.success && searchResult.data ? searchResult.data : null);
 
           if (memoryContext) {
+            const truncatedContext = memoryContext.slice(0, MAX_CONTEXT_LENGTH);
             const contextPart: Part = {
-              id: `mem-os-context-${Date.now()}`,
+              id: `prt-memos-context-${Date.now()}`,
               sessionID: input.sessionID,
               messageID: output.message.id,
               type: "text",
-              text: memoryContext,
+              text: truncatedContext,
               synthetic: true,
             };
 
@@ -108,7 +112,7 @@ export const MemOSPlugin: Plugin = async (_ctx: PluginInput) => {
             const duration = Date.now() - start;
             log("chat.message: context injected", {
               duration,
-              contextLength: memoryContext.length,
+              contextLength: truncatedContext.length,
             });
           }
         }

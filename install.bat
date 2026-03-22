@@ -5,8 +5,17 @@ set PLUGIN_NAME=opencode-memos
 set REPO=cmore-air/opencode-memos
 set INSTALL_DIR=%USERPROFILE%\.config\opencode\plugins\opencode-memos
 set OPENCODE_CONFIG_DIR=%USERPROFILE%\.config\opencode
-set OPENCODE_CONFIG=%OPENCODE_CONFIG_DIR%\opencode.jsonc
+set OPENCODE_CONFIG_JSON=%OPENCODE_CONFIG_DIR%\opencode.json
+set OPENCODE_CONFIG_JSONC=%OPENCODE_CONFIG_DIR%\opencode.jsonc
 set COMMAND_DIR=%OPENCODE_CONFIG_DIR%\command
+
+if exist "%OPENCODE_CONFIG_JSON%" (
+    set OPENCODE_CONFIG=%OPENCODE_CONFIG_JSON%
+) else if exist "%OPENCODE_CONFIG_JSONC%" (
+    set OPENCODE_CONFIG=%OPENCODE_CONFIG_JSONC%
+) else (
+    set OPENCODE_CONFIG=%OPENCODE_CONFIG_JSON%
+)
 
 echo Installing opencode-memos plugin...
 

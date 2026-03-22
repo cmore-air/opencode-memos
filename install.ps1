@@ -4,8 +4,17 @@ $PLUGIN_NAME = "opencode-memos"
 $REPO = "cmore-air/opencode-memos"
 $INSTALL_DIR = "$HOME/.config/opencode/plugins/opencode-memos"
 $OPENCODE_CONFIG_DIR = "$HOME/.config/opencode"
-$OPENCODE_CONFIG = "$OPENCODE_CONFIG_DIR/opencode.jsonc"
+$OPENCODE_CONFIG_JSON = "$OPENCODE_CONFIG_DIR/opencode.json"
+$OPENCODE_CONFIG_JSONC = "$OPENCODE_CONFIG_DIR/opencode.jsonc"
 $COMMAND_DIR = "$OPENCODE_CONFIG_DIR/command"
+
+if (Test-Path $OPENCODE_CONFIG_JSON) {
+    $OPENCODE_CONFIG = $OPENCODE_CONFIG_JSON
+} elseif (Test-Path $OPENCODE_CONFIG_JSONC) {
+    $OPENCODE_CONFIG = $OPENCODE_CONFIG_JSONC
+} else {
+    $OPENCODE_CONFIG = $OPENCODE_CONFIG_JSON
+}
 
 Write-Host "Installing opencode-memos plugin..."
 
@@ -15,22 +24,26 @@ New-Item -ItemType Directory -Force -Path $OPENCODE_CONFIG_DIR | Out-Null
 New-Item -ItemType Directory -Force -Path $COMMAND_DIR | Out-Null
 
 # Clone or update plugin
-if (Test-Path "$INSTALL_DIR/.git") {
+if (Test-Path "$INSTALL_DIR/dist/index.js") {
     Write-Host "Updating plugin..."
     Set-Location $INSTALL_DIR
     git pull
+    if (Get-Command bun -ErrorAction SilentlyContinue) {
+        bun install
+        bun run build
+    }
+} elseif (Test-Path "$INSTALL_DIR/.git") {
+    Write-Host "Plugin exists, skipping clone..."
 } else {
     Write-Host "Downloading plugin..."
     git clone --depth 1 "https://github.com/$REPO" $INSTALL_DIR
-}
-
-# Install dependencies
-Set-Location $INSTALL_DIR
-if (Get-Command bun -ErrorAction SilentlyContinue) {
-    bun install
-    bun run build
-} else {
-    Write-Host "Warning: bun not found, skipping build. Install bun first."
+    Set-Location $INSTALL_DIR
+    if (Get-Command bun -ErrorAction SilentlyContinue) {
+        bun install
+        bun run build
+    } else {
+        Write-Host "Warning: bun not found, skipping build."
+    }
 }
 
 # Register plugin in opencode.jsonc
