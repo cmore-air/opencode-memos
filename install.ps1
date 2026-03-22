@@ -37,20 +37,35 @@ if (Get-Command bun -ErrorAction SilentlyContinue) {
 $PLUGIN_PATH = "file:///$INSTALL_DIR"
 
 if (Test-Path $OPENCODE_CONFIG) {
-    $content = Get-Content $OPENCODE_CONFIG -Raw
-    if ($content -match "opencode-memos") {
+    if (Select-String -Path $OPENCODE_CONFIG -Pattern "opencode-memos" -Quiet) {
         Write-Host "Plugin already registered in config"
     } else {
-        @{
-            plugin = @($PLUGIN_PATH)
-        } | ConvertTo-Json | Set-Content $OPENCODE_CONFIG
-        Write-Host "Added plugin to config"
+        node -e "
+const fs = require('fs');
+const content = fs.readFileSync('$OPENCODE_CONFIG', 'utf8');
+const pluginPath = '$PLUGIN_PATH';
+let config;
+try {
+  const stripped = content.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  config = JSON.parse(stripped);
+} catch {
+  config = {};
+}
+if (!config.plugin) config.plugin = [];
+if (!config.plugin.includes(pluginPath)) {
+  config.plugin.push(pluginPath);
+}
+fs.writeFileSync('$OPENCODE_CONFIG', JSON.stringify(config, null, 2));
+console.log('Added plugin to config');
+"
     }
 } else {
-    @{
-        plugin = @($PLUGIN_PATH)
-    } | ConvertTo-Json | Set-Content $OPENCODE_CONFIG
-    Write-Host "Created config with plugin"
+    node -e "
+const fs = require('fs');
+const config = { plugin: ['$PLUGIN_PATH'] };
+fs.writeFileSync('$OPENCODE_CONFIG', JSON.stringify(config, null, 2));
+console.log('Created config with plugin');
+"
 }
 
 # Create commands

@@ -38,12 +38,25 @@ if [ -f "$OPENCODE_CONFIG" ]; then
     if grep -q "opencode-memos" "$OPENCODE_CONFIG"; then
         echo "Plugin already registered in config"
     else
-        if grep -q '"plugin"' "$OPENCODE_CONFIG"; then
-            sed -i "s/\"plugin\": \[/\"plugin\": [\n    \"$PLUGIN_PATH\",/" "$OPENCODE_CONFIG"
-        else
-            echo '{"plugin": ["'"$PLUGIN_PATH"'"]}' > "$OPENCODE_CONFIG"
-        fi
-        echo "Added plugin to config"
+        node -e "
+const fs = require('fs');
+const path = require('path');
+const content = fs.readFileSync('$OPENCODE_CONFIG', 'utf8');
+const pluginPath = '$PLUGIN_PATH';
+let config;
+try {
+  const stripped = content.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  config = JSON.parse(stripped);
+} catch {
+  config = {};
+}
+if (!config.plugin) config.plugin = [];
+if (!config.plugin.includes(pluginPath)) {
+  config.plugin.push(pluginPath);
+}
+fs.writeFileSync('$OPENCODE_CONFIG', JSON.stringify(config, null, 2));
+console.log('Added plugin to config');
+"
     fi
 else
     echo '{"plugin": ["'"$PLUGIN_PATH"'"]}' > "$OPENCODE_CONFIG"

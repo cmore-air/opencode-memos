@@ -65,9 +65,7 @@ function loadConfig(): MemOSConfig {
         const content = readFileSync(path, "utf-8");
         const json = stripJsoncComments(content);
         return JSON.parse(json) as MemOSConfig;
-      } catch {
-        // Invalid config, use defaults
-      }
+      } catch {}
     }
   }
   return {};

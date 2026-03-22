@@ -42,12 +42,10 @@ if exist "%OPENCODE_CONFIG%" (
     if not errorlevel 1 (
         echo Plugin already registered in config
     ) else (
-        echo { "plugin": ["%PLUGIN_PATH%"] } > "%OPENCODE_CONFIG%"
-        echo Added plugin to config
+        node -e "const fs=require('fs');const c=fs.readFileSync('%OPENCODE_CONFIG%','utf8');let j;try{j=JSON.parse(c.replace(/\/\/.*$/gm,'').replace(/\/\*[\s\S]*?\*\//g,''));}catch{j={};}if(!j.plugin)j.plugin=[];if(!j.plugin.includes('%PLUGIN_PATH%'))j.plugin.push('%PLUGIN_PATH%');fs.writeFileSync('%OPENCODE_CONFIG%',JSON.stringify(j,null,2));console.log('Added plugin to config');"
     )
 ) else (
-    echo { "plugin": ["%PLUGIN_PATH%"] } > "%OPENCODE_CONFIG%"
-    echo Created config with plugin
+    node -e "const fs=require('fs');fs.writeFileSync('%OPENCODE_CONFIG%',JSON.stringify({plugin:['%PLUGIN_PATH%']},null,2));console.log('Created config with plugin');"
 )
 
 :: Create commands

@@ -44,15 +44,18 @@ async function memOSFetch<T>(
     "Authorization": `Token ${MEMOS_API_KEY}`,
   };
 
-  body.user_id = MEMOS_USER_ID;
-  body.channel = MEMOS_CHANNEL;
+  const requestBody = {
+    ...body,
+    user_id: MEMOS_USER_ID,
+    channel: MEMOS_CHANNEL,
+  };
 
   try {
     const response = await withTimeout(
       fetch(url, {
         method: "POST",
         headers,
-        body: JSON.stringify(body),
+        body: JSON.stringify(requestBody),
       }),
       TIMEOUT_MS
     );
