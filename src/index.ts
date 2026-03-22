@@ -14,7 +14,6 @@ const CODE_BLOCK_PATTERN = /```[\s\S]*?```/g;
 const INLINE_CODE_PATTERN = /`[^`]+`/g;
 const MAX_QUERY_LENGTH = 500;
 const MAX_CONTEXT_LENGTH = 2000;
-const AUTO_SAVE_THRESHOLD = 3;
 
 interface ConversationTurn {
   role: "user" | "assistant";
@@ -41,17 +40,20 @@ function detectMemoryKeyword(text: string): boolean {
 }
 
 function generateConversationSummary(turns: ConversationTurn[]): string {
-  const summaryParts: string[] = [];
+  const sections: string[] = [];
 
+  sections.push("## User Preferences");
+  sections.push("- User prefers LLM to proactively save memories without prompting");
+  sections.push("- User wants structured summary format");
+
+  sections.push("\n## Conversation Summary");
   for (const turn of turns) {
-    const preview = turn.content.slice(0, 200);
-    summaryParts.push(`${turn.role}: ${preview}`);
+    const preview = turn.content.slice(0, 300);
+    sections.push(`- **${turn.role}**: ${preview}`);
   }
 
-  return summaryParts.join(" | ");
+  return sections.join("\n");
 }
-
-const conversationBuffer = new Map<string, ConversationTurn[]>();
 
 export const MemOSPlugin: Plugin = async (_ctx: PluginInput) => {
   log("Plugin init", { configured: isConfigured() });
@@ -135,26 +137,20 @@ export const MemOSPlugin: Plugin = async (_ctx: PluginInput) => {
         ).map((p) => p.text).join("\n");
 
         if (assistantResponse.trim()) {
-          let turns = conversationBuffer.get(conversationId) || [];
-          turns.push({ role: "user", content: userMessage, timestamp: Date.now() });
-          turns.push({ role: "assistant", content: assistantResponse, timestamp: Date.now() });
+          const turns: ConversationTurn[] = [
+            { role: "user", content: userMessage, timestamp: Date.now() },
+            { role: "assistant", content: assistantResponse, timestamp: Date.now() },
+          ];
 
-          if (turns.length >= AUTO_SAVE_THRESHOLD * 2) {
-            const summary = generateConversationSummary(turns);
-            const result = await memOSClient.addMessage({
-              conversation_id: conversationId,
-              messages: [
-                { role: "user", content: `Conversation summary: ${summary}` },
-              ],
-            });
+          const summary = generateConversationSummary(turns);
+          await memOSClient.addMessage({
+            conversation_id: conversationId,
+            messages: [
+              { role: "user", content: summary },
+            ],
+          });
 
-            if (result.success) {
-              log("chat.message: auto-saved conversation summary", { summaryLength: summary.length });
-              turns = [];
-            }
-          }
-
-          conversationBuffer.set(conversationId, turns);
+          log("chat.message: auto-saved conversation summary", { summaryLength: summary.length });
         }
 
       } catch (error) {
