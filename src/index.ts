@@ -14,6 +14,13 @@ const CODE_BLOCK_PATTERN = /```[\s\S]*?```/g;
 const INLINE_CODE_PATTERN = /`[^`]+`/g;
 const MAX_QUERY_LENGTH = 500;
 const MAX_CONTEXT_LENGTH = 2000;
+const AUTO_SAVE_THRESHOLD = 3;
+
+interface ConversationTurn {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: number;
+}
 
 const MEMORY_KEYWORD_PATTERN = new RegExp(`\\b(${CONFIG.keywordPatterns.join("|")})\\b`, "i");
 
@@ -32,6 +39,19 @@ function detectMemoryKeyword(text: string): boolean {
   const textWithoutCode = removeCodeBlocks(text);
   return MEMORY_KEYWORD_PATTERN.test(textWithoutCode);
 }
+
+function generateConversationSummary(turns: ConversationTurn[]): string {
+  const summaryParts: string[] = [];
+
+  for (const turn of turns) {
+    const preview = turn.content.slice(0, 200);
+    summaryParts.push(`${turn.role}: ${preview}`);
+  }
+
+  return summaryParts.join(" | ");
+}
+
+const conversationBuffer = new Map<string, ConversationTurn[]>();
 
 export const MemOSPlugin: Plugin = async (_ctx: PluginInput) => {
   log("Plugin init", { configured: isConfigured() });
@@ -63,13 +83,41 @@ export const MemOSPlugin: Plugin = async (_ctx: PluginInput) => {
           return;
         }
 
+        const sessionID = input.sessionID;
+        const tags = getTags(sessionID);
+        const { conversationId } = tags;
+
         log("chat.message: processing", {
           messagePreview: userMessage.slice(0, 100),
-          partsCount: output.parts.length,
-          textPartsCount: textParts.length,
+          conversationId,
         });
 
-          if (detectMemoryKeyword(userMessage)) {
+        const queryForSearch = userMessage.slice(0, MAX_QUERY_LENGTH);
+        const searchResult = await memOSClient.searchMemory(queryForSearch, conversationId);
+
+        const memoryContext = formatContextForPrompt(searchResult.success && searchResult.data ? searchResult.data : null);
+
+        if (memoryContext) {
+          const truncatedContext = memoryContext.slice(0, MAX_CONTEXT_LENGTH);
+          const contextPart: Part = {
+            id: `prt-memos-context-${Date.now()}`,
+            sessionID: input.sessionID,
+            messageID: output.message.id,
+            type: "text",
+            text: truncatedContext,
+            synthetic: true,
+          };
+
+          output.parts.unshift(contextPart);
+
+          const duration = Date.now() - start;
+          log("chat.message: context injected", {
+            duration,
+            contextLength: truncatedContext.length,
+          });
+        }
+
+        if (detectMemoryKeyword(userMessage)) {
           log("chat.message: memory keyword detected");
           const nudgePart: Part = {
             id: `prt-memos-nudge-${Date.now()}`,
@@ -82,39 +130,31 @@ export const MemOSPlugin: Plugin = async (_ctx: PluginInput) => {
           output.parts.push(nudgePart);
         }
 
-        const sessionID = input.sessionID;
-        const tags = getTags(sessionID);
-        const { conversationId } = tags;
+        const assistantResponse = textParts.filter(
+          (p) => !(p as any).synthetic
+        ).map((p) => p.text).join("\n");
 
-        const isFirstMessage = !output.parts.some(
-          (p) => p.type === "text" && (p as any).synthetic && (p as any).id?.startsWith("prt-memos-context-")
-        );
+        if (assistantResponse.trim()) {
+          let turns = conversationBuffer.get(conversationId) || [];
+          turns.push({ role: "user", content: userMessage, timestamp: Date.now() });
+          turns.push({ role: "assistant", content: assistantResponse, timestamp: Date.now() });
 
-        if (isFirstMessage) {
-          const queryForSearch = userMessage.slice(0, MAX_QUERY_LENGTH);
-          const searchResult = await memOSClient.searchMemory(queryForSearch, conversationId);
-
-          const memoryContext = formatContextForPrompt(searchResult.success && searchResult.data ? searchResult.data : null);
-
-          if (memoryContext) {
-            const truncatedContext = memoryContext.slice(0, MAX_CONTEXT_LENGTH);
-            const contextPart: Part = {
-              id: `prt-memos-context-${Date.now()}`,
-              sessionID: input.sessionID,
-              messageID: output.message.id,
-              type: "text",
-              text: truncatedContext,
-              synthetic: true,
-            };
-
-            output.parts.unshift(contextPart);
-
-            const duration = Date.now() - start;
-            log("chat.message: context injected", {
-              duration,
-              contextLength: truncatedContext.length,
+          if (turns.length >= AUTO_SAVE_THRESHOLD * 2) {
+            const summary = generateConversationSummary(turns);
+            const result = await memOSClient.addMessage({
+              conversation_id: conversationId,
+              messages: [
+                { role: "user", content: `Conversation summary: ${summary}` },
+              ],
             });
+
+            if (result.success) {
+              log("chat.message: auto-saved conversation summary", { summaryLength: summary.length });
+              turns = [];
+            }
           }
+
+          conversationBuffer.set(conversationId, turns);
         }
 
       } catch (error) {
