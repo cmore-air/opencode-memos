@@ -92,15 +92,46 @@ After installation, you can run the init command to let the agent explore and me
 
 ## Configuration
 
-All configuration via environment variables:
+### Project-level config (recommended)
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `MEMOS_API_KEY` | Yes | MemOS API key |
-| `MEMOS_USER_ID` | Yes | User ID |
-| `MEMOS_CHANNEL` | Yes | Channel identifier |
+Create `mem-os.jsonc`, `mem-os.json`, `.mem-os.jsonc`, or `.mem-os.json` in your project root:
 
-Optional:
+```jsonc
+{
+  "apiKey": "your_api_key",
+  "userId": "your_user_id",
+  "channel": "your_channel"
+}
+```
+
+Priority order for all three fields: **project config** > **environment variables** > **global config file**
+
+### Environment variables
+
+Get your API key from [MemOS Dashboard](https://memos-dashboard.openmem.net/apikeys/), then set:
+
+```bash
+export MEMOS_API_KEY="your_api_key"
+export MEMOS_USER_ID="your_user_id"
+export MEMOS_CHANNEL="your_channel"
+```
+
+> **Tip**: Add these to your shell config (e.g., `~/.bashrc` or `~/.zshrc`) for persistence.
+
+### Global config file
+
+Optionally, you can also use a global config file at `~/.config/opencode/memos.jsonc`:
+
+```jsonc
+{
+  "apiKey": "your_api_key",
+  "userId": "your_user_id",
+  "channel": "your_channel",
+  "baseUrl": "https://memos.memtensor.cn/api/openmem/v1"
+}
+```
+
+Optional settings (via global config or env var):
 
 | Variable | Default | Description |
 |----------|---------|-------------|

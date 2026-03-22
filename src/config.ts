@@ -8,6 +8,12 @@ const CONFIG_FILES = [
   join(CONFIG_DIR, "memos.jsonc"),
   join(CONFIG_DIR, "memos.json"),
 ];
+const PROJECT_CONFIG_FILES = [
+  "mem-os.jsonc",
+  "mem-os.json",
+  ".mem-os.jsonc",
+  ".mem-os.json",
+];
 
 interface MemOSConfig {
   apiKey?: string;
@@ -85,22 +91,40 @@ function loadConfig(): Partial<MemOSConfig> {
   return {};
 }
 
+function findProjectConfig(): Partial<MemOSConfig> {
+  const cwd = process.cwd();
+  for (const filename of PROJECT_CONFIG_FILES) {
+    const path = join(cwd, filename);
+    if (existsSync(path)) {
+      try {
+        const content = readFileSync(path, "utf-8");
+        const json = stripJsoncComments(content);
+        return JSON.parse(json) as MemOSConfig;
+      } catch {}
+    }
+  }
+  return {};
+}
+
 const fileConfig = loadConfig();
+const projectConfig = findProjectConfig();
 
 function getApiKey(): string | undefined {
-  // Priority: env var > config file
+  if (projectConfig.apiKey) return projectConfig.apiKey;
   if (process.env.MEMOS_API_KEY) return process.env.MEMOS_API_KEY;
   if (fileConfig.apiKey) return fileConfig.apiKey;
   return undefined;
 }
 
 function getUserId(): string | undefined {
+  if (projectConfig.userId) return projectConfig.userId;
   if (process.env.MEMOS_USER_ID) return process.env.MEMOS_USER_ID;
   if (fileConfig.userId) return fileConfig.userId;
   return undefined;
 }
 
 function getChannel(): string | undefined {
+  if (projectConfig.channel) return projectConfig.channel;
   if (process.env.MEMOS_CHANNEL) return process.env.MEMOS_CHANNEL;
   if (fileConfig.channel) return fileConfig.channel;
   return undefined;
