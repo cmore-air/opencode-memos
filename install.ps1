@@ -2,11 +2,11 @@
 
 $PLUGIN_NAME = "opencode-memos"
 $REPO = "cmore-air/opencode-memos"
-$INSTALL_DIR = "$HOME/.config/opencode/plugins/opencode-memos"
-$OPENCODE_CONFIG_DIR = "$HOME/.config/opencode"
-$OPENCODE_CONFIG_JSON = "$OPENCODE_CONFIG_DIR/opencode.json"
-$OPENCODE_CONFIG_JSONC = "$OPENCODE_CONFIG_DIR/opencode.jsonc"
-$COMMAND_DIR = "$OPENCODE_CONFIG_DIR/command"
+$OPENCODE_CONFIG_DIR = Join-Path $env:USERPROFILE ".config/opencode"
+$OPENCODE_CONFIG_JSON = Join-Path $OPENCODE_CONFIG_DIR "opencode.json"
+$OPENCODE_CONFIG_JSONC = Join-Path $OPENCODE_CONFIG_DIR "opencode.jsonc"
+$INSTALL_DIR = Join-Path $OPENCODE_CONFIG_DIR "plugins/opencode-memos"
+$COMMAND_DIR = Join-Path $OPENCODE_CONFIG_DIR "command"
 
 if (Test-Path $OPENCODE_CONFIG_JSON) {
     $OPENCODE_CONFIG = $OPENCODE_CONFIG_JSON
@@ -24,7 +24,7 @@ New-Item -ItemType Directory -Force -Path $OPENCODE_CONFIG_DIR | Out-Null
 New-Item -ItemType Directory -Force -Path $COMMAND_DIR | Out-Null
 
 # Clone or update plugin
-if (Test-Path "$INSTALL_DIR/dist/index.js") {
+if (Test-Path (Join-Path $INSTALL_DIR "dist/index.js")) {
     Write-Host "Updating plugin..."
     Set-Location $INSTALL_DIR
     git pull
@@ -32,7 +32,7 @@ if (Test-Path "$INSTALL_DIR/dist/index.js") {
         bun install
         bun run build
     }
-} elseif (Test-Path "$INSTALL_DIR/.git") {
+} elseif (Test-Path (Join-Path $INSTALL_DIR ".git")) {
     Write-Host "Plugin exists, skipping clone..."
 } else {
     Write-Host "Downloading plugin..."
@@ -46,39 +46,32 @@ if (Test-Path "$INSTALL_DIR/dist/index.js") {
     }
 }
 
-# Register plugin in opencode.jsonc
-$PLUGIN_PATH = "file:///$INSTALL_DIR"
+# Register plugin in opencode.json
+$PLUGIN_PATH = "file:///$($INSTALL_DIR -replace '\\', '/')"
 
 if (Test-Path $OPENCODE_CONFIG) {
     if (Select-String -Path $OPENCODE_CONFIG -Pattern "opencode-memos" -Quiet) {
         Write-Host "Plugin already registered in config"
     } else {
-        node -e "
-const fs = require('fs');
-const content = fs.readFileSync('$OPENCODE_CONFIG', 'utf8');
-const pluginPath = '$PLUGIN_PATH';
-let config;
-try {
-  const stripped = content.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
-  config = JSON.parse(stripped);
-} catch {
-  config = {};
-}
-if (!config.plugin) config.plugin = [];
-if (!config.plugin.includes(pluginPath)) {
-  config.plugin.push(pluginPath);
-}
-fs.writeFileSync('$OPENCODE_CONFIG', JSON.stringify(config, null, 2));
-console.log('Added plugin to config');
-"
+        $configContent = Get-Content $OPENCODE_CONFIG -Raw
+        try {
+            $config = $configContent -replace '(?m)^\s*//.*$' -replace '(?s)/\*.*?\*/' | ConvertFrom-Json
+        } catch {
+            $config = @{ plugin = @() }
+        }
+        if (-not $config.plugin) {
+            $config | Add-Member -NotePropertyName "plugin" -NotePropertyValue @() -Force
+        }
+        if (-not ($config.plugin -contains $PLUGIN_PATH)) {
+            $config.plugin += $PLUGIN_PATH
+        }
+        $config | ConvertTo-Json -Depth 10 | Set-Content $OPENCODE_CONFIG
+        Write-Host "Added plugin to config"
     }
 } else {
-    node -e "
-const fs = require('fs');
-const config = { plugin: ['$PLUGIN_PATH'] };
-fs.writeFileSync('$OPENCODE_CONFIG', JSON.stringify(config, null, 2));
-console.log('Created config with plugin');
-"
+    $config = @{ plugin = @($PLUGIN_PATH) }
+    $config | ConvertTo-Json -Depth 10 | Set-Content $OPENCODE_CONFIG
+    Write-Host "Created config with plugin"
 }
 
 # Create commands
@@ -102,8 +95,8 @@ description: Get help with mem-os memory plugin
 mem-os provides persistent memory for OpenCode agents.
 "@
 
-Set-Content -Path "$COMMAND_DIR/mem-os-init.md" -Value $initContent
-Set-Content -Path "$COMMAND_DIR/mem-os-help.md" -Value $helpContent
+Set-Content -Path (Join-Path $COMMAND_DIR "mem-os-init.md") -Value $initContent
+Set-Content -Path (Join-Path $COMMAND_DIR "mem-os-help.md") -Value $helpContent
 
 Write-Host ""
 Write-Host "Installation complete!" -ForegroundColor Green
