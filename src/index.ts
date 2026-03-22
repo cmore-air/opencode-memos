@@ -5,10 +5,11 @@ import { tool } from "@opencode-ai/plugin";
 import { memOSClient } from "./services/client.js";
 import { formatContextForPrompt } from "./services/context.js";
 import { getTags } from "./services/tags.js";
+import { createCompactionHook } from "./services/compaction.js";
 
 import { isConfigured, CONFIG } from "./config.js";
 import { log } from "./services/logger.js";
-import type { MemOSToolArgs } from "./types/index.js";
+import type { CompactionContext, MemOSToolArgs } from "./types/index.js";
 
 const CODE_BLOCK_PATTERN = /```[\s\S]*?```/g;
 const INLINE_CODE_PATTERN = /`[^`]+`/g;
@@ -55,14 +56,33 @@ function generateConversationSummary(turns: ConversationTurn[]): string {
   return sections.join("\n");
 }
 
-export const MemOSPlugin: Plugin = async (_ctx: PluginInput) => {
+export const MemOSPlugin: Plugin = async (ctx: PluginInput) => {
   log("Plugin init", { configured: isConfigured() });
 
   if (!isConfigured()) {
     log("Plugin disabled - mem-os not configured");
   }
 
+  const tags = getTags(ctx.directory);
+
+  const compactionHook = isConfigured() && ctx.client
+    ? createCompactionHook(ctx as CompactionContext, tags, {
+        threshold: CONFIG.compactionThreshold,
+      })
+    : null;
+
   return {
+    event: async (input: { event: { type: string; properties?: unknown } }) => {
+      if (compactionHook) {
+        await compactionHook.event(input);
+      }
+    },
+
+    "experimental.session.compacting": async (input, output) => {
+      if (!isConfigured() || !compactionHook) return;
+      log("experimental.session.compacting: triggered", { sessionID: input.sessionID });
+    },
+
     "chat.message": async (input, output) => {
       if (!isConfigured()) return;
 

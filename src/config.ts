@@ -19,6 +19,13 @@ interface MemOSConfig {
   maxProfileItems?: number;
   injectProfile?: boolean;
   keywordPatterns?: string[];
+  compactionThreshold?: number;
+  minTokensForCompaction?: number;
+  compactionCooldownSeconds?: number;
+  containerTagPrefix?: string;
+  userContainerTag: string | undefined;
+  projectContainerTag: string | undefined;
+  maxProjectMemories?: number;
 }
 
 const DEFAULT_KEYWORD_PATTERNS = [
@@ -47,6 +54,13 @@ const DEFAULTS: Required<Omit<MemOSConfig, "apiKey" | "userId" | "channel">> = {
   maxProfileItems: 5,
   injectProfile: true,
   keywordPatterns: [],
+  compactionThreshold: 0.80,
+  minTokensForCompaction: 50000,
+  compactionCooldownSeconds: 30,
+  containerTagPrefix: "opencode",
+  userContainerTag: undefined,
+  projectContainerTag: undefined,
+  maxProjectMemories: 10,
 };
 
 function isValidRegex(pattern: string): boolean {
@@ -58,7 +72,7 @@ function isValidRegex(pattern: string): boolean {
   }
 }
 
-function loadConfig(): MemOSConfig {
+function loadConfig(): Partial<MemOSConfig> {
   for (const path of CONFIG_FILES) {
     if (existsSync(path)) {
       try {
@@ -106,6 +120,13 @@ export const CONFIG = {
     ...DEFAULT_KEYWORD_PATTERNS,
     ...(fileConfig.keywordPatterns ?? []).filter(isValidRegex),
   ],
+  compactionThreshold: fileConfig.compactionThreshold ?? DEFAULTS.compactionThreshold,
+  minTokensForCompaction: fileConfig.minTokensForCompaction ?? DEFAULTS.minTokensForCompaction,
+  compactionCooldownSeconds: fileConfig.compactionCooldownSeconds ?? DEFAULTS.compactionCooldownSeconds,
+  containerTagPrefix: fileConfig.containerTagPrefix ?? DEFAULTS.containerTagPrefix,
+  userContainerTag: fileConfig.userContainerTag,
+  projectContainerTag: fileConfig.projectContainerTag,
+  maxProjectMemories: fileConfig.maxProjectMemories ?? DEFAULTS.maxProjectMemories,
 };
 
 export function isConfigured(): boolean {

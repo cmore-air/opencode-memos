@@ -176,3 +176,59 @@ export interface MemOSToolArgs {
   userId?: string;
   conversationId?: string;
 }
+
+// Tag scope for dual-range memory
+export type TagScope = "user" | "project" | "conversation";
+
+// Extended tags with dual-range memory support
+export interface MemOSTags {
+  conversationId: string;
+  user: string;
+  project: string;
+}
+
+// Compaction state tracking
+export interface CompactionState {
+  lastCompactionTime: Map<string, number>;
+  compactionInProgress: Set<string>;
+  summarizedSessions: Set<string>;
+}
+
+// Compaction configuration
+export interface CompactionConfig {
+  threshold: number;
+  minTokens: number;
+  cooldownMs: number;
+  getModelLimit?: (providerID: string, modelID: string) => number | undefined;
+}
+
+// Compaction context from plugin input
+export interface CompactionContext {
+  directory: string;
+  client: {
+    session: {
+      summarize: (params: { path: { id: string }; body: { providerID: string; modelID: string }; query: { directory: string } }) => Promise<unknown>;
+      messages: (params: { path: { id: string }; query: { directory: string } }) => Promise<{ data?: Array<{ info: MessageInfo }> }>;
+      promptAsync: (params: { path: { id: string }; body: { agent?: string; parts: Array<{ type: string; text: string }> }; query: { directory: string } }) => Promise<unknown>;
+    };
+    tui: {
+      showToast: (params: { body: { title: string; message: string; variant: string; duration: number } }) => Promise<unknown>;
+    };
+  };
+}
+
+// Message info from session events
+export interface MessageInfo {
+  id: string;
+  role: string;
+  sessionID: string;
+  providerID?: string;
+  modelID?: string;
+  tokens?: {
+    input: number;
+    output: number;
+    cache: { read: number; write: number };
+  };
+  summary?: boolean;
+  finish?: boolean;
+}
