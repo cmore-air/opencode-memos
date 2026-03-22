@@ -45,17 +45,30 @@ export MEMOS_CHANNEL="your_channel"
 
 ## Features
 
+### Memory Triggers
+
+**When does the agent search for memories?**
+- On **every user message** — the agent searches for relevant memories before responding
+
+**When does the agent save memories?**
+- **Automatically after every response** — the agent proactively saves a structured summary of the conversation
+- When you use keywords like "remember", "save this", "don't forget"
+
+### Memory Format
+
+Saved memories include:
+- User preferences
+- Technical decisions
+- Project facts
+- Work patterns
+
 ### Context Injection
 
-On the first message, the agent automatically receives (invisible to user):
+Before responding, the agent receives (invisible to you):
 
 - Factual memories (project knowledge)
 - Preference memories (user preferences)
 - Tool memories (usage experience)
-
-### Keyword Detection
-
-When you say "remember", "save this", "don't forget", etc., the agent automatically saves to memory.
 
 ### Tool Usage
 
