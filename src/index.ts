@@ -22,7 +22,15 @@ interface ConversationTurn {
   timestamp: number;
 }
 
-const MEMORY_KEYWORD_PATTERN = new RegExp(`\\b(${CONFIG.keywordPatterns.join("|")})\\b`, "i");
+// Initialize with try-catch to prevent plugin crash on startup errors
+let MEMORY_KEYWORD_PATTERN: RegExp;
+try {
+  const patterns = CONFIG.keywordPatterns || [];
+  MEMORY_KEYWORD_PATTERN = new RegExp(`\\b(${patterns.join("|")})\\b`, "i");
+} catch (e) {
+  log("Failed to initialize MEMORY_KEYWORD_PATTERN, using default", { error: String(e) });
+  MEMORY_KEYWORD_PATTERN = new RegExp(`\\b(remember|memorize|save\\s+this)\\b`, "i");
+}
 
 const MEMORY_NUDGE_MESSAGE = `[MEMORY TRIGGER DETECTED]
 The user wants you to remember something. You MUST use the \`mem-os\` tool with \`mode: "add"\` to save this information.
@@ -57,22 +65,23 @@ function generateConversationSummary(turns: ConversationTurn[]): string {
 }
 
 export const MemOSPlugin: Plugin = async (ctx: PluginInput) => {
-  log("Plugin init", { configured: isConfigured() });
+  try {
+    log("Plugin init", { configured: isConfigured() });
 
-  if (!isConfigured()) {
-    log("Plugin disabled - mem-os not configured");
-  }
+    if (!isConfigured()) {
+      log("Plugin disabled - mem-os not configured");
+    }
 
-  const tags = getTags(ctx.directory);
+    const tags = getTags(ctx.directory);
 
-  const compactionHook = isConfigured() && ctx.client
-    ? createCompactionHook(ctx as CompactionContext, tags, {
-        threshold: CONFIG.compactionThreshold,
-      })
-    : null;
+    const compactionHook = isConfigured() && ctx.client
+      ? createCompactionHook(ctx as CompactionContext, tags, {
+          threshold: CONFIG.compactionThreshold,
+        })
+      : null;
 
-  return {
-    event: async (input: { event: { type: string; properties?: unknown } }) => {
+    return {
+      event: async (input: { event: { type: string; properties?: unknown } }) => {
       if (compactionHook) {
         await compactionHook.event(input);
       }
@@ -488,4 +497,13 @@ export const MemOSPlugin: Plugin = async (ctx: PluginInput) => {
       }),
     },
   };
+  } catch (error) {
+    log("Plugin initialization error", { error: error instanceof Error ? error.message : String(error) });
+    // Return a minimal plugin that won't crash the host
+    return {
+      event: async () => {},
+      hooks: {},
+      tools: {},
+    };
+  }
 };
