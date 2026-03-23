@@ -500,7 +500,6 @@ Modes:
     log("Plugin initialization error", { error: error instanceof Error ? error.message : String(error) });
     return {
       event: async () => {},
-      tool: {},
     };
   }
 };

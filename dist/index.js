@@ -13732,8 +13732,7 @@ Modes:
   } catch (error45) {
     log("Plugin initialization error", { error: error45 instanceof Error ? error45.message : String(error45) });
     return {
-      event: async () => {},
-      tool: {}
+      event: async () => {}
     };
   }
 };
