@@ -148,15 +148,98 @@ export interface AddFeedbackResponse {
     status: string;
     task_id: string;
 }
+export type TaskStatus = "Queued" | "Running" | "Completed" | "Failed";
+export interface TaskStatusResponse {
+    task_id: string;
+    status: TaskStatus;
+    result?: Record<string, unknown>;
+    error?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+export interface EnhancedFeedbackRequest {
+    user_id?: string;
+    conversation_id: string;
+    feedback_content: string;
+    retrieved_memory_ids?: string[];
+    corrected_answer?: string;
+    agent_id?: string;
+    app_id?: string;
+    feedback_time?: string;
+    allow_public?: boolean;
+    allow_knowledgebase_ids?: string[];
+}
+export interface FeedbackResult {
+    add?: string[];
+    update?: string[];
+    archive?: string[];
+}
+export interface EnhancedFeedbackResponse {
+    success: boolean;
+    status: string;
+    task_id: string;
+    record?: FeedbackResult;
+    answer?: string;
+}
+export interface MemoryFilterOptions {
+    limit?: number;
+    relativity?: number;
+    memory_types?: MemoryType[];
+    preference_types?: PreferenceType[];
+    min_confidence?: number;
+    tags?: string[];
+}
+export interface MemCubeOptions {
+    readable_cube_ids?: string[];
+    writable_cube_ids?: string[];
+}
+export type AddMode = "fast" | "fine";
+export interface ChatMessage {
+    role: "user" | "assistant" | "system";
+    content: string;
+}
+export interface ChatRequest {
+    user_id?: string;
+    query: string;
+    history?: ChatMessage[];
+    readable_cube_ids?: string[];
+    writable_cube_ids?: string[];
+    stream?: boolean;
+}
+export interface ChatResponse {
+    response: string;
+    memories_used?: MemoryDetail[];
+    task_id?: string;
+}
+export interface SuggestRequest {
+    user_id?: string;
+    conversation_id?: string;
+    history?: ChatMessage[];
+    count?: number;
+}
+export interface SuggestResponse {
+    suggestions: string[];
+    mode: "conversation" | "user_profile";
+}
 export interface MemOSToolArgs {
-    mode?: "add" | "search" | "get" | "delete" | "feedback" | "help";
+    mode?: "add" | "search" | "get" | "delete" | "feedback" | "status" | "chat" | "suggest" | "help";
     content?: string;
     query?: string;
     memoryId?: string;
     memoryIds?: string[];
+    retrievedMemoryIds?: string[];
     limit?: number;
     userId?: string;
     conversationId?: string;
+    taskId?: string;
+    memoryTypes?: MemoryType[];
+    preferenceTypes?: PreferenceType[];
+    minConfidence?: number;
+    readableCubeIds?: string[];
+    writableCubeIds?: string[];
+    addMode?: AddMode;
+    history?: ChatMessage[];
+    correctedAnswer?: string;
 }
 export type TagScope = "user" | "project" | "conversation";
 export interface MemOSTags {

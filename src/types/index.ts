@@ -165,16 +165,151 @@ export interface AddFeedbackResponse {
   task_id: string;
 }
 
-// Tool args for mem-os tool
+// ============================================
+// Task Status Query (Improvement #1)
+// ============================================
+
+export type TaskStatus = "Queued" | "Running" | "Completed" | "Failed";
+
+export interface TaskStatusResponse {
+  task_id: string;
+  status: TaskStatus;
+  result?: Record<string, unknown>;
+  error?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// ============================================
+// Enhanced Feedback (Improvement #2)
+// ============================================
+
+export interface EnhancedFeedbackRequest {
+  user_id?: string;
+  conversation_id: string;
+  feedback_content: string;
+  retrieved_memory_ids?: string[];  // 精准定位要修正的记忆
+  corrected_answer?: string;        // 可选：生成修正后回复
+  agent_id?: string;
+  app_id?: string;
+  feedback_time?: string;
+  allow_public?: boolean;
+  allow_knowledgebase_ids?: string[];
+}
+
+export interface FeedbackResult {
+  add?: string[];      // 新增的记忆 ID
+  update?: string[];   // 更新的记忆 ID
+  archive?: string[];  // 归档的记忆 ID
+}
+
+export interface EnhancedFeedbackResponse {
+  success: boolean;
+  status: string;
+  task_id: string;
+  record?: FeedbackResult;
+  answer?: string;     // 修正后的自然语言回复
+}
+
+// ============================================
+// Memory Type Filtering (Improvement #4)
+// ============================================
+
+export interface MemoryFilterOptions {
+  limit?: number;
+  relativity?: number;
+  memory_types?: MemoryType[];         // 按记忆类型过滤
+  preference_types?: PreferenceType[]; // 按偏好类型过滤
+  min_confidence?: number;             // 最小置信度阈值 (0-1)
+  tags?: string[];                     // 按标签过滤
+}
+
+// ============================================
+// Multi-MemCube Support (Improvement #5)
+// ============================================
+
+export interface MemCubeOptions {
+  readable_cube_ids?: string[];  // 搜索时可读的 cube 列表
+  writable_cube_ids?: string[];  // 写入时的目标 cube 列表
+}
+
+// ============================================
+// Fast/Fine Mode (Improvement #6)
+// ============================================
+
+export type AddMode = "fast" | "fine";  // Fast: 快速切片, Fine: LLM 深度提取
+
+// ============================================
+// Chat Mode (Improvement #7)
+// ============================================
+
+export interface ChatMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
+export interface ChatRequest {
+  user_id?: string;
+  query: string;
+  history?: ChatMessage[];
+  readable_cube_ids?: string[];
+  writable_cube_ids?: string[];
+  stream?: boolean;  // 是否流式输出
+}
+
+export interface ChatResponse {
+  response: string;
+  memories_used?: MemoryDetail[];
+  task_id?: string;
+}
+
+// ============================================
+// Suggest Mode (Improvement #8)
+// ============================================
+
+export interface SuggestRequest {
+  user_id?: string;
+  conversation_id?: string;
+  history?: ChatMessage[];  // 最近的对话历史（用于基于对话的建议）
+  count?: number;           // 返回建议数量，默认 3
+}
+
+export interface SuggestResponse {
+  suggestions: string[];  // 推荐问题列表
+  mode: "conversation" | "user_profile";  // 建议模式
+}
+
+// ============================================
+// Extended Tool Args
+// ============================================
+
 export interface MemOSToolArgs {
-  mode?: "add" | "search" | "get" | "delete" | "feedback" | "help";
+  mode?: "add" | "search" | "get" | "delete" | "feedback" | "status" | "chat" | "suggest" | "help";
+  // Content and query
   content?: string;
   query?: string;
+  // Memory IDs
   memoryId?: string;
   memoryIds?: string[];
+  retrievedMemoryIds?: string[];  // Enhanced feedback
+  // Pagination
   limit?: number;
+  // IDs
   userId?: string;
   conversationId?: string;
+  taskId?: string;               // Task status query
+  // Filters
+  memoryTypes?: MemoryType[];
+  preferenceTypes?: PreferenceType[];
+  minConfidence?: number;
+  // Multi-cube
+  readableCubeIds?: string[];
+  writableCubeIds?: string[];
+  // Modes
+  addMode?: AddMode;
+  // Chat
+  history?: ChatMessage[];
+  correctedAnswer?: string;      // Enhanced feedback
 }
 
 // Tag scope for dual-range memory

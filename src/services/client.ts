@@ -8,6 +8,14 @@ import type {
   DeleteMemoryResponse,
   AddFeedbackRequest,
   AddFeedbackResponse,
+  TaskStatusResponse,
+  EnhancedFeedbackRequest,
+  EnhancedFeedbackResponse,
+  MemoryFilterOptions,
+  ChatRequest,
+  ChatResponse,
+  SuggestRequest,
+  SuggestResponse,
 } from "../types/index.js";
 
 const TIMEOUT_MS = 30000;
@@ -33,7 +41,6 @@ async function memOSFetch<T>(
   endpoint: string,
   body: Record<string, unknown>
 ): Promise<MemOSClientResponse<T>> {
-  // 配置不完整时静默返回，这是正常现象
   if (!MEMOS_API_KEY || !MEMOS_USER_ID || !MEMOS_CHANNEL) {
     return { success: true };
   }
@@ -97,7 +104,7 @@ export class MemOSClient {
   async searchMemory(
     query: string,
     conversationId?: string,
-    options?: { limit?: number; relativity?: number }
+    options?: MemoryFilterOptions
   ): Promise<MemOSClientResponse<SearchMemoryResponse>> {
     log("MemOSClient.searchMemory: start", { query, conversationId });
     const body: Record<string, unknown> = {
@@ -127,6 +134,45 @@ export class MemOSClient {
   async addFeedback(request: AddFeedbackRequest): Promise<MemOSClientResponse<AddFeedbackResponse>> {
     log("MemOSClient.addFeedback: start", { conversationId: request.conversation_id });
     return memOSFetch<AddFeedbackResponse>("/add/feedback", request as unknown as Record<string, unknown>);
+  }
+
+  async getTaskStatus(taskId: string): Promise<MemOSClientResponse<TaskStatusResponse>> {
+    log("MemOSClient.getTaskStatus: start", { taskId });
+    const body: Record<string, unknown> = { task_id: taskId };
+    return memOSFetch<TaskStatusResponse>("/get/status", body);
+  }
+
+  async addFeedbackEnhanced(request: EnhancedFeedbackRequest): Promise<MemOSClientResponse<EnhancedFeedbackResponse>> {
+    log("MemOSClient.addFeedbackEnhanced: start", { 
+      conversationId: request.conversation_id,
+      hasMemoryIds: !!request.retrieved_memory_ids?.length,
+    });
+    return memOSFetch<EnhancedFeedbackResponse>("/product/feedback", request as unknown as Record<string, unknown>);
+  }
+
+  async chat(request: ChatRequest): Promise<MemOSClientResponse<ChatResponse>> {
+    log("MemOSClient.chat: start", { query: request.query.slice(0, 50) });
+    const body: Record<string, unknown> = {
+      query: request.query,
+      history: request.history,
+      readable_cube_ids: request.readable_cube_ids,
+      writable_cube_ids: request.writable_cube_ids,
+      stream: false,
+    };
+    return memOSFetch<ChatResponse>("/chat/complete", body);
+  }
+
+  async getSuggestions(request: SuggestRequest): Promise<MemOSClientResponse<SuggestResponse>> {
+    log("MemOSClient.getSuggestions: start", { 
+      conversationId: request.conversation_id,
+      historyLength: request.history?.length,
+    });
+    const body: Record<string, unknown> = {
+      conversation_id: request.conversation_id,
+      history: request.history,
+      count: request.count ?? 3,
+    };
+    return memOSFetch<SuggestResponse>("/suggestion/queries", body);
   }
 }
 

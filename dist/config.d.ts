@@ -15,6 +15,9 @@ export declare const CONFIG: {
     userContainerTag: string | undefined;
     projectContainerTag: string | undefined;
     maxProjectMemories: number;
+    readableCubeIds: string[];
+    writableCubeIds: string[];
+    defaultAddMode: "fast" | "fine";
 };
 export declare function isConfigured(): boolean;
 //# sourceMappingURL=config.d.ts.map

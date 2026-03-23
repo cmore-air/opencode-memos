@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { stripJsoncComments } from "./services/jsonc.js";
 import { setDebug, debug } from "./services/logger.js";
+import type { AddMode } from "./types/index.js";
 
 const CONFIG_DIR = join(homedir(), ".config", "opencode");
 const CONFIG_FILES = [
@@ -36,6 +37,9 @@ interface MemOSConfig {
   projectContainerTag: string | undefined;
   maxProjectMemories?: number;
   debug?: boolean;
+  readableCubeIds?: string[];
+  writableCubeIds?: string[];
+  defaultAddMode?: "fast" | "fine";
 }
 
 const DEFAULT_KEYWORD_PATTERNS = [
@@ -72,6 +76,9 @@ const DEFAULTS: Required<Omit<MemOSConfig, "apiKey" | "userId" | "channel">> = {
   projectContainerTag: undefined,
   maxProjectMemories: 10,
   debug: false,
+  readableCubeIds: [],
+  writableCubeIds: [],
+  defaultAddMode: "fine",
 };
 
 function isValidRegex(pattern: string): boolean {
@@ -203,6 +210,9 @@ export const CONFIG = {
   userContainerTag: projectConfig.userContainerTag ?? fileConfig.userContainerTag,
   projectContainerTag: projectConfig.projectContainerTag ?? fileConfig.projectContainerTag,
   maxProjectMemories: projectConfig.maxProjectMemories ?? fileConfig.maxProjectMemories ?? DEFAULTS.maxProjectMemories,
+  readableCubeIds: projectConfig.readableCubeIds ?? fileConfig.readableCubeIds ?? DEFAULTS.readableCubeIds,
+  writableCubeIds: projectConfig.writableCubeIds ?? fileConfig.writableCubeIds ?? DEFAULTS.writableCubeIds,
+  defaultAddMode: projectConfig.defaultAddMode ?? fileConfig.defaultAddMode ?? DEFAULTS.defaultAddMode,
 };
 
 if (debugEnabled) {

@@ -76,11 +76,54 @@ The `mem-os` tool is available for the agent:
 
 | Mode | Args | Description |
 |------|------|-------------|
-| `add` | `content` | Add a memory |
-| `search` | `query` | Search memories |
-| `get` | `memoryId` | Get a single memory |
-| `delete` | `memoryIds` | Delete memories |
-| `feedback` | `content` | Add feedback |
+| `add` | `content`, `conversationId?`, `addMode?` | Store a new memory (supports multimodal) |
+| `search` | `query`, `conversationId?`, `memoryTypes?`, `minConfidence?`, `limit?` | Search memories with filters |
+| `get` | `memoryId` | Get a single memory by ID |
+| `delete` | `memoryIds` | Delete memories by IDs |
+| `feedback` | `content`, `conversationId?`, `retrievedMemoryIds?`, `correctedAnswer?` | Correct memories with feedback |
+| `status` | `taskId` | Query async task status |
+| `chat` | `query`, `history?`, `readableCubeIds?` | Chat with memory context |
+| `suggest` | `conversationId?`, `history?` | Get suggested follow-up questions |
+| `help` | - | Show usage guide |
+
+### New Features (v2.1)
+
+#### Memory Type Filtering
+Search supports filtering by memory type:
+- `memoryTypes`: Filter by `WorkingMemory`, `LongTermMemory`, `UserMemory`
+- `preferenceTypes`: Filter by `explicit_preference`, `implicit_preference`
+- `minConfidence`: Minimum confidence threshold (0-1)
+
+#### Enhanced Feedback
+Provide precise memory corrections:
+- `retrievedMemoryIds`: Target specific memories to correct
+- `correctedAnswer`: Optionally generate a corrected response
+
+#### Chat Mode
+Have a full conversation with memory context:
+- Automatically retrieves relevant memories
+- Generates response with memory awareness
+- Saves conversation as new memories
+
+#### Suggest Mode
+Get AI-generated follow-up question suggestions:
+- Based on conversation history
+- Based on user profile/preferences
+
+#### Task Status
+Query async task status:
+- Check if memory operations completed
+- Get results from background tasks
+
+### Configuration Options
+
+Additional settings available in config file:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `readableCubeIds` | `[]` | Default cubes to search from |
+| `writableCubeIds` | `[]` | Default cubes to write to |
+| `defaultAddMode` | `"fine"` | Default add mode (`fast` or `fine`) |
 
 ## Initialize Codebase
 

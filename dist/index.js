@@ -12528,7 +12528,10 @@ var DEFAULTS = {
   userContainerTag: undefined,
   projectContainerTag: undefined,
   maxProjectMemories: 10,
-  debug: false
+  debug: false,
+  readableCubeIds: [],
+  writableCubeIds: [],
+  defaultAddMode: "fine"
 };
 function isValidRegex(pattern) {
   try {
@@ -12647,7 +12650,10 @@ var CONFIG = {
   containerTagPrefix: projectConfig.containerTagPrefix ?? fileConfig.containerTagPrefix ?? DEFAULTS.containerTagPrefix,
   userContainerTag: projectConfig.userContainerTag ?? fileConfig.userContainerTag,
   projectContainerTag: projectConfig.projectContainerTag ?? fileConfig.projectContainerTag,
-  maxProjectMemories: projectConfig.maxProjectMemories ?? fileConfig.maxProjectMemories ?? DEFAULTS.maxProjectMemories
+  maxProjectMemories: projectConfig.maxProjectMemories ?? fileConfig.maxProjectMemories ?? DEFAULTS.maxProjectMemories,
+  readableCubeIds: projectConfig.readableCubeIds ?? fileConfig.readableCubeIds ?? DEFAULTS.readableCubeIds,
+  writableCubeIds: projectConfig.writableCubeIds ?? fileConfig.writableCubeIds ?? DEFAULTS.writableCubeIds,
+  defaultAddMode: projectConfig.defaultAddMode ?? fileConfig.defaultAddMode ?? DEFAULTS.defaultAddMode
 };
 if (debugEnabled) {
   debug("Final CONFIG applied", CONFIG);
@@ -12736,10 +12742,55 @@ class MemOSClient {
     log("MemOSClient.addFeedback: start", { conversationId: request.conversation_id });
     return memOSFetch("/add/feedback", request);
   }
+  async getTaskStatus(taskId) {
+    log("MemOSClient.getTaskStatus: start", { taskId });
+    const body = { task_id: taskId };
+    return memOSFetch("/get/status", body);
+  }
+  async addFeedbackEnhanced(request) {
+    log("MemOSClient.addFeedbackEnhanced: start", {
+      conversationId: request.conversation_id,
+      hasMemoryIds: !!request.retrieved_memory_ids?.length
+    });
+    return memOSFetch("/product/feedback", request);
+  }
+  async chat(request) {
+    log("MemOSClient.chat: start", { query: request.query.slice(0, 50) });
+    const body = {
+      query: request.query,
+      history: request.history,
+      readable_cube_ids: request.readable_cube_ids,
+      writable_cube_ids: request.writable_cube_ids,
+      stream: false
+    };
+    return memOSFetch("/chat/complete", body);
+  }
+  async getSuggestions(request) {
+    log("MemOSClient.getSuggestions: start", {
+      conversationId: request.conversation_id,
+      historyLength: request.history?.length
+    });
+    const body = {
+      conversation_id: request.conversation_id,
+      history: request.history,
+      count: request.count ?? 3
+    };
+    return memOSFetch("/suggestion/queries", body);
+  }
 }
 var memOSClient = new MemOSClient;
 
 // src/services/context.ts
+function categorizeMemories(memories, preferences, toolMemories) {
+  return {
+    workingMemories: memories.filter((m) => m.memory_type === "WorkingMemory"),
+    longTermMemories: memories.filter((m) => m.memory_type === "LongTermMemory"),
+    userMemories: memories.filter((m) => m.memory_type === "UserMemory"),
+    explicitPreferences: preferences.filter((p) => p.preference_type === "explicit_preference"),
+    implicitPreferences: preferences.filter((p) => p.preference_type === "implicit_preference"),
+    toolMemories
+  };
+}
 function formatContextForPrompt(searchResult) {
   const parts = ["[MEMOS]"];
   if (!searchResult) {
@@ -12747,28 +12798,54 @@ function formatContextForPrompt(searchResult) {
   }
   const { memory_detail_list, preference_detail_list, tool_memory_detail_list } = searchResult;
   const memories = memory_detail_list || [];
-  if (memories.length > 0) {
+  const preferences = preference_detail_list || [];
+  const toolMems = tool_memory_detail_list || [];
+  if (memories.length === 0 && preferences.length === 0 && toolMems.length === 0) {
+    return "";
+  }
+  const categorized = categorizeMemories(memories, preferences, toolMems);
+  if (categorized.longTermMemories.length > 0) {
     parts.push(`
-Facts:`);
-    memories.forEach((mem) => {
+Long-term Knowledge:`);
+    categorized.longTermMemories.forEach((mem) => {
       const confidence = Math.round((mem.confidence ?? 0) * 100);
       parts.push(`- [${confidence}%] ${mem.memory_value}`);
     });
   }
-  const preferences = preference_detail_list || [];
-  if (preferences.length > 0) {
+  if (categorized.workingMemories.length > 0) {
     parts.push(`
-Preferences:`);
-    preferences.forEach((pref) => {
-      const typeTag = pref.preference_type === "explicit_preference" ? "explicit" : "implicit";
-      parts.push(`- [${typeTag}] ${pref.preference}`);
+Recent Context:`);
+    categorized.workingMemories.forEach((mem) => {
+      const confidence = Math.round((mem.confidence ?? 0) * 100);
+      parts.push(`- [${confidence}%] ${mem.memory_value}`);
     });
   }
-  const toolMemories = tool_memory_detail_list || [];
-  if (toolMemories.length > 0) {
+  if (categorized.userMemories.length > 0) {
     parts.push(`
-Tool Memories:`);
-    toolMemories.forEach((tm) => {
+User Information:`);
+    categorized.userMemories.forEach((mem) => {
+      const confidence = Math.round((mem.confidence ?? 0) * 100);
+      parts.push(`- [${confidence}%] ${mem.memory_value}`);
+    });
+  }
+  if (categorized.explicitPreferences.length > 0) {
+    parts.push(`
+Explicit Preferences:`);
+    categorized.explicitPreferences.forEach((pref) => {
+      parts.push(`- [explicit] ${pref.preference}`);
+    });
+  }
+  if (categorized.implicitPreferences.length > 0) {
+    parts.push(`
+Implicit Preferences:`);
+    categorized.implicitPreferences.forEach((pref) => {
+      parts.push(`- [implicit] ${pref.preference}`);
+    });
+  }
+  if (categorized.toolMemories.length > 0) {
+    parts.push(`
+Tool Usage Experience:`);
+    categorized.toolMemories.forEach((tm) => {
       const relativity = Math.round((tm.relativity ?? 0) * 100);
       parts.push(`- [${relativity}%] ${tm.tool_value}`);
     });
@@ -13411,15 +13488,49 @@ var MemOSPlugin = async (ctx) => {
       },
       tool: {
         "mem-os": tool({
-          description: "Manage and query the mem-os persistent memory system. Use 'search' to find relevant memories, 'add' to store new knowledge, 'get' to retrieve a memory, 'delete' to remove a memory, 'feedback' to provide feedback.",
+          description: `Manage and query the mem-os persistent memory system.
+
+Modes:
+- add: Store new knowledge (supports multimodal: text, images, files)
+- search: Find relevant memories (with type/confidence filtering)
+- get: Retrieve a specific memory by ID
+- delete: Remove memories by IDs
+- feedback: Provide feedback to correct/improve memories
+- status: Query async task status by taskId
+- chat: Have a conversation with memory context
+- suggest: Get suggested follow-up questions
+- help: Show usage guide`,
           args: {
-            mode: tool.schema.enum(["add", "search", "get", "delete", "feedback", "help"]).optional(),
+            mode: tool.schema.enum([
+              "add",
+              "search",
+              "get",
+              "delete",
+              "feedback",
+              "status",
+              "chat",
+              "suggest",
+              "help"
+            ]).optional(),
             content: tool.schema.string().optional(),
             query: tool.schema.string().optional(),
             memoryId: tool.schema.string().optional(),
             memoryIds: tool.schema.array(tool.schema.string()).optional(),
+            retrievedMemoryIds: tool.schema.array(tool.schema.string()).optional(),
             limit: tool.schema.number().optional(),
-            conversationId: tool.schema.string().optional()
+            conversationId: tool.schema.string().optional(),
+            taskId: tool.schema.string().optional(),
+            memoryTypes: tool.schema.array(tool.schema.string()).optional(),
+            preferenceTypes: tool.schema.array(tool.schema.string()).optional(),
+            minConfidence: tool.schema.number().optional(),
+            readableCubeIds: tool.schema.array(tool.schema.string()).optional(),
+            writableCubeIds: tool.schema.array(tool.schema.string()).optional(),
+            addMode: tool.schema.enum(["fast", "fine"]).optional(),
+            history: tool.schema.array(tool.schema.object({
+              role: tool.schema.enum(["user", "assistant", "system"]),
+              content: tool.schema.string()
+            })).optional(),
+            correctedAnswer: tool.schema.string().optional()
           },
           async execute(args) {
             if (!isConfigured()) {
@@ -13436,74 +13547,42 @@ var MemOSPlugin = async (ctx) => {
                     success: true,
                     message: "mem-os Usage Guide",
                     commands: [
-                      {
-                        command: "add",
-                        description: "Store a new memory",
-                        args: ["content", "conversationId?"]
-                      },
-                      {
-                        command: "search",
-                        description: "Search memories",
-                        args: ["query", "conversationId?"]
-                      },
-                      {
-                        command: "get",
-                        description: "Get a memory by ID",
-                        args: ["memoryId"]
-                      },
-                      {
-                        command: "delete",
-                        description: "Delete memories",
-                        args: ["memoryIds"]
-                      },
-                      {
-                        command: "feedback",
-                        description: "Add feedback",
-                        args: ["content", "conversationId?"]
-                      }
+                      { command: "add", description: "Store a new memory", args: ["content", "conversationId?", "addMode?"] },
+                      { command: "search", description: "Search memories with filters", args: ["query", "conversationId?", "memoryTypes?", "minConfidence?"] },
+                      { command: "get", description: "Get a memory by ID", args: ["memoryId"] },
+                      { command: "delete", description: "Delete memories", args: ["memoryIds"] },
+                      { command: "feedback", description: "Correct memories with feedback", args: ["content", "conversationId?", "retrievedMemoryIds?"] },
+                      { command: "status", description: "Query async task status", args: ["taskId"] },
+                      { command: "chat", description: "Chat with memory context", args: ["query", "history?"] },
+                      { command: "suggest", description: "Get suggested questions", args: ["conversationId?", "history?"] }
                     ]
                   });
                 }
                 case "add": {
                   if (!args.content) {
-                    return JSON.stringify({
-                      success: false,
-                      error: "content parameter is required for add mode"
-                    });
+                    return JSON.stringify({ success: false, error: "content required" });
                   }
                   const sessionID = args.conversationId || "default";
-                  const messages = [
-                    { role: "user", content: args.content }
-                  ];
-                  const result = await memOSClient.addMessage({
-                    conversation_id: sessionID,
-                    messages
-                  });
+                  const messages = [{ role: "user", content: args.content }];
+                  const result = await memOSClient.addMessage({ conversation_id: sessionID, messages });
                   if (!result.success) {
-                    return JSON.stringify({
-                      success: false,
-                      error: result.error || "Failed to add memory"
-                    });
+                    return JSON.stringify({ success: false, error: result.error || "Failed to add memory" });
                   }
-                  return JSON.stringify({
-                    success: true,
-                    message: "Memory added",
-                    taskId: result.data?.task_id
-                  });
+                  return JSON.stringify({ success: true, message: "Memory added", taskId: result.data?.task_id });
                 }
                 case "search": {
                   if (!args.query) {
-                    return JSON.stringify({
-                      success: false,
-                      error: "query parameter is required for search mode"
-                    });
+                    return JSON.stringify({ success: false, error: "query required" });
                   }
-                  const result = await memOSClient.searchMemory(args.query, args.conversationId, args.limit ? { limit: args.limit } : undefined);
+                  const filterOptions = {
+                    limit: args.limit,
+                    memory_types: args.memoryTypes,
+                    preference_types: args.preferenceTypes,
+                    min_confidence: args.minConfidence
+                  };
+                  const result = await memOSClient.searchMemory(args.query, args.conversationId, filterOptions);
                   if (!result.success) {
-                    return JSON.stringify({
-                      success: false,
-                      error: result.error || "Failed to search memories"
-                    });
+                    return JSON.stringify({ success: false, error: result.error || "Failed to search" });
                   }
                   const data = result.data || result;
                   const memories = data.memory_detail_list || [];
@@ -13514,31 +13593,23 @@ var MemOSPlugin = async (ctx) => {
                     results: memories.map((r) => ({
                       id: r.id,
                       content: r.memory_value,
-                      similarity: Math.round((r.confidence ?? 0) * 100)
+                      type: r.memory_type,
+                      confidence: Math.round((r.confidence ?? 1) * 100)
                     }))
                   });
                 }
                 case "get": {
                   if (!args.memoryId) {
-                    return JSON.stringify({
-                      success: false,
-                      error: "memoryId parameter is required for get mode"
-                    });
+                    return JSON.stringify({ success: false, error: "memoryId required" });
                   }
                   const result = await memOSClient.searchMemory("", args.conversationId, { limit: 100 });
                   if (!result.success) {
-                    return JSON.stringify({
-                      success: false,
-                      error: result.error || "Failed to get memory"
-                    });
+                    return JSON.stringify({ success: false, error: result.error || "Failed to get memory" });
                   }
                   const data = result.data || result;
                   const memory = (data.memory_detail_list || []).find((r) => r.id === args.memoryId);
                   if (!memory) {
-                    return JSON.stringify({
-                      success: false,
-                      error: "Memory not found"
-                    });
+                    return JSON.stringify({ success: false, error: "Memory not found" });
                   }
                   return JSON.stringify({
                     success: true,
@@ -13553,57 +13624,91 @@ var MemOSPlugin = async (ctx) => {
                 }
                 case "delete": {
                   if (!args.memoryIds || args.memoryIds.length === 0) {
-                    return JSON.stringify({
-                      success: false,
-                      error: "memoryIds parameter is required for delete mode"
-                    });
+                    return JSON.stringify({ success: false, error: "memoryIds required" });
                   }
                   const result = await memOSClient.deleteMemory(args.memoryIds);
                   if (!result.success) {
-                    return JSON.stringify({
-                      success: false,
-                      error: result.error || "Failed to delete memory"
-                    });
+                    return JSON.stringify({ success: false, error: result.error || "Failed to delete" });
                   }
-                  return JSON.stringify({
-                    success: true,
-                    message: `Deleted ${args.memoryIds.length} memory(ies)`
-                  });
+                  return JSON.stringify({ success: true, message: `Deleted ${args.memoryIds.length} memory(ies)` });
                 }
                 case "feedback": {
                   if (!args.content) {
-                    return JSON.stringify({
-                      success: false,
-                      error: "content parameter is required for feedback mode"
-                    });
+                    return JSON.stringify({ success: false, error: "content required" });
                   }
-                  const result = await memOSClient.addFeedback({
+                  const result = await memOSClient.addFeedbackEnhanced({
                     conversation_id: args.conversationId || "default",
-                    feedback_content: args.content
+                    feedback_content: args.content,
+                    retrieved_memory_ids: args.retrievedMemoryIds,
+                    corrected_answer: args.correctedAnswer
                   });
                   if (!result.success) {
-                    return JSON.stringify({
-                      success: false,
-                      error: result.error || "Failed to add feedback"
-                    });
+                    return JSON.stringify({ success: false, error: result.error || "Failed to add feedback" });
                   }
                   return JSON.stringify({
                     success: true,
-                    message: "Feedback added",
+                    message: "Feedback processed",
+                    taskId: result.data?.task_id,
+                    record: result.data?.record,
+                    answer: result.data?.answer
+                  });
+                }
+                case "status": {
+                  if (!args.taskId) {
+                    return JSON.stringify({ success: false, error: "taskId required" });
+                  }
+                  const result = await memOSClient.getTaskStatus(args.taskId);
+                  if (!result.success) {
+                    return JSON.stringify({ success: false, error: result.error || "Failed to get status" });
+                  }
+                  return JSON.stringify({
+                    success: true,
+                    taskId: result.data?.task_id,
+                    status: result.data?.status,
+                    result: result.data?.result,
+                    error: result.data?.error
+                  });
+                }
+                case "chat": {
+                  if (!args.query) {
+                    return JSON.stringify({ success: false, error: "query required" });
+                  }
+                  const result = await memOSClient.chat({
+                    query: args.query,
+                    history: args.history,
+                    readable_cube_ids: args.readableCubeIds,
+                    writable_cube_ids: args.writableCubeIds
+                  });
+                  if (!result.success) {
+                    return JSON.stringify({ success: false, error: result.error || "Failed to chat" });
+                  }
+                  return JSON.stringify({
+                    success: true,
+                    response: result.data?.response,
+                    memoriesUsed: result.data?.memories_used?.map((m) => ({ id: m.id, content: m.memory_value })),
                     taskId: result.data?.task_id
                   });
                 }
-                default:
-                  return JSON.stringify({
-                    success: false,
-                    error: `Unknown mode: ${mode}`
+                case "suggest": {
+                  const result = await memOSClient.getSuggestions({
+                    conversation_id: args.conversationId,
+                    history: args.history,
+                    count: args.limit ?? 3
                   });
+                  if (!result.success) {
+                    return JSON.stringify({ success: false, error: result.error || "Failed to get suggestions" });
+                  }
+                  return JSON.stringify({
+                    success: true,
+                    suggestions: result.data?.suggestions,
+                    mode: result.data?.mode
+                  });
+                }
+                default:
+                  return JSON.stringify({ success: false, error: `Unknown mode: ${mode}` });
               }
             } catch (error45) {
-              return JSON.stringify({
-                success: false,
-                error: error45 instanceof Error ? error45.message : String(error45)
-              });
+              return JSON.stringify({ success: false, error: error45 instanceof Error ? error45.message : String(error45) });
             }
           }
         })
@@ -13613,8 +13718,7 @@ var MemOSPlugin = async (ctx) => {
     log("Plugin initialization error", { error: error45 instanceof Error ? error45.message : String(error45) });
     return {
       event: async () => {},
-      hooks: {},
-      tools: {}
+      tool: {}
     };
   }
 };
