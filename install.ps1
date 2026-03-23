@@ -24,16 +24,16 @@ New-Item -ItemType Directory -Force -Path $OPENCODE_CONFIG_DIR | Out-Null
 New-Item -ItemType Directory -Force -Path $COMMAND_DIR | Out-Null
 
 # Clone or update plugin
-if (Test-Path (Join-Path $INSTALL_DIR "dist/index.js")) {
-    Write-Host "Updating plugin..."
+if (Test-Path (Join-Path $INSTALL_DIR ".git")) {
+    Write-Host "Plugin exists, updating..."
     Set-Location $INSTALL_DIR
-    git pull
+    git pull --force
     if (Get-Command bun -ErrorAction SilentlyContinue) {
         bun install
         bun run build
+    } else {
+        Write-Host "Warning: bun not found, skipping build."
     }
-} elseif (Test-Path (Join-Path $INSTALL_DIR ".git")) {
-    Write-Host "Plugin exists, skipping clone..."
 } else {
     Write-Host "Downloading plugin..."
     git clone --depth 1 "https://github.com/$REPO" $INSTALL_DIR
