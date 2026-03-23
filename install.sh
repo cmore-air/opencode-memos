@@ -30,15 +30,6 @@ else
     git clone --depth 1 "https://github.com/$REPO" "$INSTALL_DIR"
 fi
 
-# Install dependencies
-cd "$INSTALL_DIR"
-if command -v bun &> /dev/null; then
-    bun install
-    bun run build
-else
-    echo "Warning: bun not found, skipping build. Install bun first."
-fi
-
 # Register plugin in opencode.json
 mkdir -p "$OPENCODE_CONFIG_DIR"
 

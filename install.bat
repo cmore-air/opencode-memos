@@ -33,15 +33,6 @@ if exist "%INSTALL_DIR%\.git" (
     git clone --depth 1 "https://github.com/%REPO%" "%INSTALL_DIR%"
 )
 
-:: Install dependencies
-cd /d "%INSTALL_DIR%"
-if exist "bun.exe" (
-    call bun install
-    call bun run build
-) else (
-    echo Warning: bun not found, skipping build. Install bun first.
-)
-
 :: Register plugin using PowerShell for reliable JSON handling
 set PLUGIN_PATH=file:///%INSTALL_DIR%
 set PLUGIN_PATH=%PLUGIN_PATH:\=/%

@@ -28,22 +28,10 @@ if (Test-Path (Join-Path $INSTALL_DIR ".git")) {
     Write-Host "Plugin exists, updating..."
     Set-Location $INSTALL_DIR
     git pull --force
-    if (Get-Command bun -ErrorAction SilentlyContinue) {
-        bun install
-        bun run build
-    } else {
-        Write-Host "Warning: bun not found, skipping build."
-    }
 } else {
     Write-Host "Downloading plugin..."
     git clone --depth 1 "https://github.com/$REPO" $INSTALL_DIR
     Set-Location $INSTALL_DIR
-    if (Get-Command bun -ErrorAction SilentlyContinue) {
-        bun install
-        bun run build
-    } else {
-        Write-Host "Warning: bun not found, skipping build."
-    }
 }
 
 # Register plugin in opencode.json
