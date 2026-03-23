@@ -214,6 +214,9 @@ export interface CompactionContext {
     tui: {
       showToast: (params: { body: { title: string; message: string; variant: string; duration: number } }) => Promise<unknown>;
     };
+    provider: {
+      list: () => Promise<{ data?: { all?: Array<{ id: string; models?: Record<string, { limit?: { context?: number } }> }> } }>;
+    };
   };
 }
 

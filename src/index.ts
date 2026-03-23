@@ -16,12 +16,6 @@ const INLINE_CODE_PATTERN = /`[^`]+`/g;
 const MAX_QUERY_LENGTH = 500;
 const MAX_CONTEXT_LENGTH = 2000;
 
-interface ConversationTurn {
-  role: "user" | "assistant";
-  content: string;
-  timestamp: number;
-}
-
 // Initialize with try-catch to prevent plugin crash on startup errors
 let MEMORY_KEYWORD_PATTERN: RegExp;
 try {
@@ -48,25 +42,12 @@ function detectMemoryKeyword(text: string): boolean {
   return MEMORY_KEYWORD_PATTERN.test(textWithoutCode);
 }
 
-function generateConversationSummary(turns: ConversationTurn[]): string {
-  const sections: string[] = [];
-
-  sections.push("## User Preferences");
-  sections.push("- User prefers LLM to proactively save memories without prompting");
-  sections.push("- User wants structured summary format");
-
-  sections.push("\n## Conversation Summary");
-  for (const turn of turns) {
-    const preview = turn.content.slice(0, 300);
-    sections.push(`- **${turn.role}**: ${preview}`);
-  }
-
-  return sections.join("\n");
-}
-
 export const MemOSPlugin: Plugin = async (ctx: PluginInput) => {
   try {
-    const tags = getTags(ctx.directory);
+    const directory = ctx.directory;
+    const tags = getTags(directory);
+    const injectedSessions = new Set<string>();
+    log("Plugin init", { directory, tags, configured: isConfigured() });
 
     // 未配置时静默跳过
     if (!isConfigured()) {
@@ -75,9 +56,39 @@ export const MemOSPlugin: Plugin = async (ctx: PluginInput) => {
       };
     }
 
+    // Fetch model limits once at plugin init
+    const modelLimits = new Map<string, number>();
+
+    (async () => {
+      try {
+        if (ctx.client?.provider?.list) {
+          const response = await ctx.client.provider.list();
+          if (response.data?.all) {
+            for (const provider of response.data.all) {
+              if (provider.models) {
+                for (const [modelId, model] of Object.entries(provider.models)) {
+                  if (model.limit?.context) {
+                    modelLimits.set(`${provider.id}/${modelId}`, model.limit.context);
+                  }
+                }
+              }
+            }
+          }
+          log("Model limits loaded", { count: modelLimits.size });
+        }
+      } catch (error) {
+        log("Failed to fetch model limits", { error: String(error) });
+      }
+    })();
+
+    const getModelLimit = (providerID: string, modelID: string): number | undefined => {
+      return modelLimits.get(`${providerID}/${modelID}`);
+    };
+
     const compactionHook = ctx.client
       ? createCompactionHook(ctx as CompactionContext, tags, {
           threshold: CONFIG.compactionThreshold,
+          getModelLimit,
         })
       : null;
 
@@ -115,38 +126,42 @@ export const MemOSPlugin: Plugin = async (ctx: PluginInput) => {
           return;
         }
 
-        const sessionID = input.sessionID;
-        const tags = getTags(sessionID);
-        const { conversationId } = tags;
-
         log("chat.message: processing", {
           messagePreview: userMessage.slice(0, 100),
-          conversationId,
         });
 
-        const queryForSearch = userMessage.slice(0, MAX_QUERY_LENGTH);
-        const searchResult = await memOSClient.searchMemory(queryForSearch, conversationId);
+        const isFirstMessage = !injectedSessions.has(input.sessionID);
 
-        const memoryContext = formatContextForPrompt(searchResult.success && searchResult.data ? searchResult.data : null);
+        if (isFirstMessage) {
+          injectedSessions.add(input.sessionID);
 
-        if (memoryContext) {
-          const truncatedContext = memoryContext.slice(0, MAX_CONTEXT_LENGTH);
-          const contextPart: Part = {
-            id: `prt-memos-context-${Date.now()}`,
-            sessionID: input.sessionID,
-            messageID: output.message.id,
-            type: "text",
-            text: truncatedContext,
-            synthetic: true,
-          };
+          const sessionID = input.sessionID;
+          const { conversationId } = getTags(sessionID);
 
-          output.parts.unshift(contextPart);
+          const queryForSearch = userMessage.slice(0, MAX_QUERY_LENGTH);
+          const searchResult = await memOSClient.searchMemory(queryForSearch, conversationId);
 
-          const duration = Date.now() - start;
-          log("chat.message: context injected", {
-            duration,
-            contextLength: truncatedContext.length,
-          });
+          const memoryContext = formatContextForPrompt(searchResult.success && searchResult.data ? searchResult.data : null);
+
+          if (memoryContext) {
+            const truncatedContext = memoryContext.slice(0, MAX_CONTEXT_LENGTH);
+            const contextPart: Part = {
+              id: `prt-memos-context-${Date.now()}`,
+              sessionID: input.sessionID,
+              messageID: output.message.id,
+              type: "text",
+              text: truncatedContext,
+              synthetic: true,
+            };
+
+            output.parts.unshift(contextPart);
+
+            const duration = Date.now() - start;
+            log("chat.message: context injected", {
+              duration,
+              contextLength: truncatedContext.length,
+            });
+          }
         }
 
         if (detectMemoryKeyword(userMessage)) {
@@ -160,27 +175,6 @@ export const MemOSPlugin: Plugin = async (ctx: PluginInput) => {
             synthetic: true,
           };
           output.parts.push(nudgePart);
-        }
-
-        const assistantResponse = textParts.filter(
-          (p) => !(p as any).synthetic
-        ).map((p) => p.text).join("\n");
-
-        if (assistantResponse.trim()) {
-          const turns: ConversationTurn[] = [
-            { role: "user", content: userMessage, timestamp: Date.now() },
-            { role: "assistant", content: assistantResponse, timestamp: Date.now() },
-          ];
-
-          const summary = generateConversationSummary(turns);
-          await memOSClient.addMessage({
-            conversation_id: conversationId,
-            messages: [
-              { role: "user", content: summary },
-            ],
-          });
-
-          log("chat.message: auto-saved conversation summary", { summaryLength: summary.length });
         }
 
       } catch (error) {

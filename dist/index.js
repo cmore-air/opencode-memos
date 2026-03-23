@@ -13242,30 +13242,45 @@ function detectMemoryKeyword(text) {
   const textWithoutCode = removeCodeBlocks(text);
   return MEMORY_KEYWORD_PATTERN.test(textWithoutCode);
 }
-function generateConversationSummary(turns) {
-  const sections = [];
-  sections.push("## User Preferences");
-  sections.push("- User prefers LLM to proactively save memories without prompting");
-  sections.push("- User wants structured summary format");
-  sections.push(`
-## Conversation Summary`);
-  for (const turn of turns) {
-    const preview = turn.content.slice(0, 300);
-    sections.push(`- **${turn.role}**: ${preview}`);
-  }
-  return sections.join(`
-`);
-}
 var MemOSPlugin = async (ctx) => {
   try {
-    const tags = getTags(ctx.directory);
+    const directory = ctx.directory;
+    const tags = getTags(directory);
+    const injectedSessions = new Set;
+    log("Plugin init", { directory, tags, configured: isConfigured() });
     if (!isConfigured()) {
       return {
         event: async () => {}
       };
     }
+    const modelLimits = new Map;
+    (async () => {
+      try {
+        if (ctx.client?.provider?.list) {
+          const response = await ctx.client.provider.list();
+          if (response.data?.all) {
+            for (const provider of response.data.all) {
+              if (provider.models) {
+                for (const [modelId, model] of Object.entries(provider.models)) {
+                  if (model.limit?.context) {
+                    modelLimits.set(`${provider.id}/${modelId}`, model.limit.context);
+                  }
+                }
+              }
+            }
+          }
+          log("Model limits loaded", { count: modelLimits.size });
+        }
+      } catch (error45) {
+        log("Failed to fetch model limits", { error: String(error45) });
+      }
+    })();
+    const getModelLimit = (providerID, modelID) => {
+      return modelLimits.get(`${providerID}/${modelID}`);
+    };
     const compactionHook = ctx.client ? createCompactionHook(ctx, tags, {
-      threshold: CONFIG.compactionThreshold
+      threshold: CONFIG.compactionThreshold,
+      getModelLimit
     }) : null;
     return {
       event: async (input) => {
@@ -13294,32 +13309,34 @@ var MemOSPlugin = async (ctx) => {
             log("chat.message: empty message, skipping");
             return;
           }
-          const sessionID = input.sessionID;
-          const tags2 = getTags(sessionID);
-          const { conversationId } = tags2;
           log("chat.message: processing", {
-            messagePreview: userMessage.slice(0, 100),
-            conversationId
+            messagePreview: userMessage.slice(0, 100)
           });
-          const queryForSearch = userMessage.slice(0, MAX_QUERY_LENGTH);
-          const searchResult = await memOSClient.searchMemory(queryForSearch, conversationId);
-          const memoryContext = formatContextForPrompt(searchResult.success && searchResult.data ? searchResult.data : null);
-          if (memoryContext) {
-            const truncatedContext = memoryContext.slice(0, MAX_CONTEXT_LENGTH);
-            const contextPart = {
-              id: `prt-memos-context-${Date.now()}`,
-              sessionID: input.sessionID,
-              messageID: output.message.id,
-              type: "text",
-              text: truncatedContext,
-              synthetic: true
-            };
-            output.parts.unshift(contextPart);
-            const duration3 = Date.now() - start;
-            log("chat.message: context injected", {
-              duration: duration3,
-              contextLength: truncatedContext.length
-            });
+          const isFirstMessage = !injectedSessions.has(input.sessionID);
+          if (isFirstMessage) {
+            injectedSessions.add(input.sessionID);
+            const sessionID = input.sessionID;
+            const { conversationId } = getTags(sessionID);
+            const queryForSearch = userMessage.slice(0, MAX_QUERY_LENGTH);
+            const searchResult = await memOSClient.searchMemory(queryForSearch, conversationId);
+            const memoryContext = formatContextForPrompt(searchResult.success && searchResult.data ? searchResult.data : null);
+            if (memoryContext) {
+              const truncatedContext = memoryContext.slice(0, MAX_CONTEXT_LENGTH);
+              const contextPart = {
+                id: `prt-memos-context-${Date.now()}`,
+                sessionID: input.sessionID,
+                messageID: output.message.id,
+                type: "text",
+                text: truncatedContext,
+                synthetic: true
+              };
+              output.parts.unshift(contextPart);
+              const duration3 = Date.now() - start;
+              log("chat.message: context injected", {
+                duration: duration3,
+                contextLength: truncatedContext.length
+              });
+            }
           }
           if (detectMemoryKeyword(userMessage)) {
             log("chat.message: memory keyword detected");
@@ -13332,22 +13349,6 @@ var MemOSPlugin = async (ctx) => {
               synthetic: true
             };
             output.parts.push(nudgePart);
-          }
-          const assistantResponse = textParts.filter((p) => !p.synthetic).map((p) => p.text).join(`
-`);
-          if (assistantResponse.trim()) {
-            const turns = [
-              { role: "user", content: userMessage, timestamp: Date.now() },
-              { role: "assistant", content: assistantResponse, timestamp: Date.now() }
-            ];
-            const summary = generateConversationSummary(turns);
-            await memOSClient.addMessage({
-              conversation_id: conversationId,
-              messages: [
-                { role: "user", content: summary }
-              ]
-            });
-            log("chat.message: auto-saved conversation summary", { summaryLength: summary.length });
           }
         } catch (error45) {
           log("chat.message: ERROR", { error: String(error45) });
