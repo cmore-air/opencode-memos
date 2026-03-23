@@ -32,6 +32,7 @@ export interface AddMessageRequest {
   agent_id?: string;
   app_id?: string;
   allow_knowledgebase_ids?: string[];
+  add_mode?: "fast" | "fine";
 }
 
 // Memory types

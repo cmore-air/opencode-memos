@@ -38,6 +38,7 @@ export interface AddMessageRequest {
     agent_id?: string;
     app_id?: string;
     allow_knowledgebase_ids?: string[];
+    add_mode?: "fast" | "fine";
 }
 export type MemoryType = "WorkingMemory" | "LongTermMemory" | "UserMemory";
 export type PreferenceType = "explicit_preference" | "implicit_preference";

@@ -13563,12 +13563,27 @@ Modes:
                     return JSON.stringify({ success: false, error: "content required" });
                   }
                   const sessionID = args.conversationId || "default";
-                  const messages = [{ role: "user", content: args.content }];
-                  const result = await memOSClient.addMessage({ conversation_id: sessionID, messages });
+                  let content;
+                  try {
+                    const parsed = JSON.parse(args.content);
+                    if (Array.isArray(parsed) && parsed[0]?.type) {
+                      content = parsed;
+                    } else {
+                      content = args.content;
+                    }
+                  } catch {
+                    content = args.content;
+                  }
+                  const messages = [{ role: "user", content }];
+                  const result = await memOSClient.addMessage({
+                    conversation_id: sessionID,
+                    messages,
+                    add_mode: args.addMode || CONFIG.defaultAddMode
+                  });
                   if (!result.success) {
                     return JSON.stringify({ success: false, error: result.error || "Failed to add memory" });
                   }
-                  return JSON.stringify({ success: true, message: "Memory added", taskId: result.data?.task_id });
+                  return JSON.stringify({ success: true, message: "Memory added", taskId: result.data?.task_id, mode: args.addMode || CONFIG.defaultAddMode });
                 }
                 case "search": {
                   if (!args.query) {
