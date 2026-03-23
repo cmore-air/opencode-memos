@@ -36,7 +36,7 @@ export function debug(message: string, data?: unknown) {
         ? `[${timestamp}] [DEBUG] ${message}: ${JSON.stringify(data)}\n`
         : `[${timestamp}] [DEBUG] ${message}\n`;
       appendFileSync(LOG_FILE, line);
-      console.error(`[mem-os DEBUG] ${message}`, data || "");
+      // Only write to file, not to stderr to avoid polluting OpenCode UI
     } catch {}
   }
 }

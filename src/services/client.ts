@@ -50,7 +50,7 @@ async function memOSFetch<T>(
     channel: MEMOS_CHANNEL,
   };
 
-  debug(`MemOS API request: ${endpoint}`, { url, body: requestBody });
+  debug(`MemOS API request: ${endpoint}`, { url, hasBody: !!body });
 
   try {
     const response = await withTimeout(
@@ -72,7 +72,7 @@ async function memOSFetch<T>(
     }
 
     const result = await response.json() as { code: number; data: T; message: string };
-    debug(`MemOS API success: ${endpoint}`, { code: result.code, message: result.message });
+    debug(`MemOS API response: ${endpoint}`, { code: result.code, message: result.message });
     return { 
       success: result.code === 0, 
       data: result.data, 
