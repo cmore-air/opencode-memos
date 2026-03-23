@@ -12666,7 +12666,7 @@ function withTimeout(promise2, ms) {
 }
 async function memOSFetch(endpoint, body) {
   if (!MEMOS_API_KEY || !MEMOS_USER_ID || !MEMOS_CHANNEL) {
-    return { success: false, error: "mem-os not configured: missing MEMOS_API_KEY, MEMOS_USER_ID, or MEMOS_CHANNEL" };
+    return { success: true };
   }
   const url2 = `${CONFIG.baseUrl}${endpoint}`;
   const headers = {
@@ -13258,12 +13258,13 @@ function generateConversationSummary(turns) {
 }
 var MemOSPlugin = async (ctx) => {
   try {
-    log("Plugin init", { configured: isConfigured() });
-    if (!isConfigured()) {
-      log("Plugin disabled - mem-os not configured");
-    }
     const tags = getTags(ctx.directory);
-    const compactionHook = isConfigured() && ctx.client ? createCompactionHook(ctx, tags, {
+    if (!isConfigured()) {
+      return {
+        event: async () => {}
+      };
+    }
+    const compactionHook = ctx.client ? createCompactionHook(ctx, tags, {
       threshold: CONFIG.compactionThreshold
     }) : null;
     return {

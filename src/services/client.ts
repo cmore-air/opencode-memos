@@ -33,8 +33,9 @@ async function memOSFetch<T>(
   endpoint: string,
   body: Record<string, unknown>
 ): Promise<MemOSClientResponse<T>> {
+  // 配置不完整时静默返回，这是正常现象
   if (!MEMOS_API_KEY || !MEMOS_USER_ID || !MEMOS_CHANNEL) {
-    return { success: false, error: "mem-os not configured: missing MEMOS_API_KEY, MEMOS_USER_ID, or MEMOS_CHANNEL" };
+    return { success: true };
   }
 
   const url = `${CONFIG.baseUrl}${endpoint}`;

@@ -66,15 +66,16 @@ function generateConversationSummary(turns: ConversationTurn[]): string {
 
 export const MemOSPlugin: Plugin = async (ctx: PluginInput) => {
   try {
-    log("Plugin init", { configured: isConfigured() });
-
-    if (!isConfigured()) {
-      log("Plugin disabled - mem-os not configured");
-    }
-
     const tags = getTags(ctx.directory);
 
-    const compactionHook = isConfigured() && ctx.client
+    // 未配置时静默跳过
+    if (!isConfigured()) {
+      return {
+        event: async () => {},
+      };
+    }
+
+    const compactionHook = ctx.client
       ? createCompactionHook(ctx as CompactionContext, tags, {
           threshold: CONFIG.compactionThreshold,
         })
