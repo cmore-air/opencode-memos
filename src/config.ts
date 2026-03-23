@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { stripJsoncComments } from "./services/jsonc.js";
+import { setDebug, debug } from "./services/logger.js";
 
 const CONFIG_DIR = join(homedir(), ".config", "opencode");
 const CONFIG_FILES = [
@@ -34,6 +35,7 @@ interface MemOSConfig {
   userContainerTag: string | undefined;
   projectContainerTag: string | undefined;
   maxProjectMemories?: number;
+  debug?: boolean;
 }
 
 const DEFAULT_KEYWORD_PATTERNS = [
@@ -69,6 +71,7 @@ const DEFAULTS: Required<Omit<MemOSConfig, "apiKey" | "userId" | "channel">> = {
   userContainerTag: undefined,
   projectContainerTag: undefined,
   maxProjectMemories: 10,
+  debug: false,
 };
 
 function isValidRegex(pattern: string): boolean {
@@ -80,20 +83,23 @@ function isValidRegex(pattern: string): boolean {
   }
 }
 
-function loadConfig(): Partial<MemOSConfig> {
+function loadConfig(): { config: Partial<MemOSConfig>; source?: string } {
   for (const path of CONFIG_FILES) {
     if (existsSync(path)) {
       try {
         const content = readFileSync(path, "utf-8");
         const json = stripJsoncComments(content);
-        return JSON.parse(json) as MemOSConfig;
-      } catch {}
+        debug(`Global config loaded from: ${path}`, JSON.parse(json));
+        return { config: JSON.parse(json) as MemOSConfig, source: path };
+      } catch (e) {
+        debug(`Failed to parse global config: ${path}`, { error: String(e) });
+      }
     }
   }
-  return {};
+  return { config: {} };
 }
 
-function findProjectConfig(): Partial<MemOSConfig> {
+function findProjectConfig(): { config: Partial<MemOSConfig>; source?: string } {
   const cwd = process.cwd();
   for (const filename of PROJECT_CONFIG_FILES) {
     const path = join(cwd, filename);
@@ -101,40 +107,84 @@ function findProjectConfig(): Partial<MemOSConfig> {
       try {
         const content = readFileSync(path, "utf-8");
         const json = stripJsoncComments(content);
-        return JSON.parse(json) as MemOSConfig;
-      } catch {}
+        debug(`Project config loaded from: ${path}`, JSON.parse(json));
+        return { config: JSON.parse(json) as MemOSConfig, source: path };
+      } catch (e) {
+        debug(`Failed to parse project config: ${path}`, { error: String(e) });
+      }
     }
   }
-  return {};
+  return { config: {} };
 }
 
-const fileConfig = loadConfig();
-const projectConfig = findProjectConfig();
+const { config: fileConfig, source: fileConfigSource } = loadConfig();
+const { config: projectConfig, source: projectConfigSource } = findProjectConfig();
 
 function getApiKey(): string | undefined {
-  if (projectConfig.apiKey) return projectConfig.apiKey;
-  if (fileConfig.apiKey) return fileConfig.apiKey;
-  if (process.env.MEMOS_API_KEY) return process.env.MEMOS_API_KEY;
+  if (projectConfig.apiKey) {
+    debug("API key source: project config", { source: projectConfigSource });
+    return projectConfig.apiKey;
+  }
+  if (fileConfig.apiKey) {
+    debug("API key source: global config", { source: fileConfigSource });
+    return fileConfig.apiKey;
+  }
+  if (process.env.MEMOS_API_KEY) {
+    debug("API key source: environment variable");
+    return process.env.MEMOS_API_KEY;
+  }
+  debug("API key: not found in any source");
   return undefined;
 }
 
 function getUserId(): string | undefined {
-  if (projectConfig.userId) return projectConfig.userId;
-  if (fileConfig.userId) return fileConfig.userId;
-  if (process.env.MEMOS_USER_ID) return process.env.MEMOS_USER_ID;
+  if (projectConfig.userId) {
+    debug("User ID source: project config", { source: projectConfigSource });
+    return projectConfig.userId;
+  }
+  if (fileConfig.userId) {
+    debug("User ID source: global config", { source: fileConfigSource });
+    return fileConfig.userId;
+  }
+  if (process.env.MEMOS_USER_ID) {
+    debug("User ID source: environment variable");
+    return process.env.MEMOS_USER_ID;
+  }
+  debug("User ID: not found in any source");
   return undefined;
 }
 
 function getChannel(): string | undefined {
-  if (projectConfig.channel) return projectConfig.channel;
-  if (fileConfig.channel) return fileConfig.channel;
-  if (process.env.MEMOS_CHANNEL) return process.env.MEMOS_CHANNEL;
+  if (projectConfig.channel) {
+    debug("Channel source: project config", { source: projectConfigSource });
+    return projectConfig.channel;
+  }
+  if (fileConfig.channel) {
+    debug("Channel source: global config", { source: fileConfigSource });
+    return fileConfig.channel;
+  }
+  if (process.env.MEMOS_CHANNEL) {
+    debug("Channel source: environment variable");
+    return process.env.MEMOS_CHANNEL;
+  }
+  debug("Channel: not found in any source");
   return undefined;
 }
 
 export const MEMOS_API_KEY = getApiKey();
 export const MEMOS_USER_ID = getUserId();
 export const MEMOS_CHANNEL = getChannel();
+
+// Enable debug mode if configured
+const debugEnabled = projectConfig.debug ?? fileConfig.debug ?? false;
+setDebug(debugEnabled);
+
+if (debugEnabled) {
+  debug("Debug mode enabled");
+  debug("Config priority: project config > global config > environment variables");
+  debug("Project config source", { source: projectConfigSource || "none" });
+  debug("Global config source", { source: fileConfigSource || "none" });
+}
 
 export const CONFIG = {
   baseUrl: projectConfig.baseUrl ?? fileConfig.baseUrl ?? DEFAULTS.baseUrl,
@@ -154,6 +204,10 @@ export const CONFIG = {
   projectContainerTag: projectConfig.projectContainerTag ?? fileConfig.projectContainerTag,
   maxProjectMemories: projectConfig.maxProjectMemories ?? fileConfig.maxProjectMemories ?? DEFAULTS.maxProjectMemories,
 };
+
+if (debugEnabled) {
+  debug("Final CONFIG applied", CONFIG);
+}
 
 export function isConfigured(): boolean {
   return !!(MEMOS_API_KEY && MEMOS_USER_ID && MEMOS_CHANNEL);

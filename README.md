@@ -137,6 +137,27 @@ Optional settings (via global config or env var):
 |----------|---------|-------------|
 | `MEMOS_BASE_URL` | MemOS default | API URL |
 
+### Debug Mode
+
+Enable debug mode to see detailed logs of configuration loading and API requests:
+
+```jsonc
+{
+  "apiKey": "your_api_key",
+  "userId": "your_user_id",
+  "channel": "your_channel",
+  "debug": true
+}
+```
+
+Debug output includes:
+- Which config file was loaded and from which path
+- Configuration priority resolution
+- All API requests and responses
+- Detailed error information
+
+Debug logs are written to `~/.config/opencode/.opencode-memos.log` and printed to stderr.
+
 ## Development
 
 ```bash

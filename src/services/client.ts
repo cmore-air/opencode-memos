@@ -1,4 +1,4 @@
-import { log } from "./logger.js";
+import { log, debug } from "./logger.js";
 import { MEMOS_API_KEY, MEMOS_USER_ID, MEMOS_CHANNEL, CONFIG } from "../config.js";
 import type {
   AddMessageRequest,
@@ -50,6 +50,8 @@ async function memOSFetch<T>(
     channel: MEMOS_CHANNEL,
   };
 
+  debug(`MemOS API request: ${endpoint}`, { url, body: requestBody });
+
   try {
     const response = await withTimeout(
       fetch(url, {
@@ -60,13 +62,17 @@ async function memOSFetch<T>(
       TIMEOUT_MS
     );
 
+    debug(`MemOS API response: ${endpoint}`, { status: response.status, statusText: response.statusText });
+
     if (!response.ok) {
       const errorText = await response.text().catch(() => "Unknown error");
       log(`MemOS API error: ${response.status} ${response.statusText}`, { endpoint, error: errorText });
+      debug(`MemOS API error body: ${endpoint}`, { error: errorText });
       return { success: false, error: `HTTP ${response.status}: ${response.statusText}` };
     }
 
     const result = await response.json() as { code: number; data: T; message: string };
+    debug(`MemOS API success: ${endpoint}`, { code: result.code, message: result.message });
     return { 
       success: result.code === 0, 
       data: result.data, 
@@ -76,6 +82,7 @@ async function memOSFetch<T>(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log(`MemOS fetch error: ${errorMessage}`, { endpoint });
+    debug(`MemOS fetch exception: ${endpoint}`, { error: errorMessage });
     return { success: false, error: errorMessage };
   }
 }
