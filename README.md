@@ -104,7 +104,7 @@ Create `mem-os.jsonc`, `mem-os.json`, `.mem-os.jsonc`, or `.mem-os.json` in your
 }
 ```
 
-Priority order for all three fields: **project config** > **environment variables** > **global config file**
+Priority order for all three fields: **project config** > **global config file** > **environment variables**
 
 ### Environment variables
 
@@ -120,7 +120,7 @@ export MEMOS_CHANNEL="your_channel"
 
 ### Global config file
 
-Optionally, you can also use a global config file at `~/.config/opencode/memos.jsonc`:
+Optionally, you can also use a global config file at `~/.config/opencode/mem-os.jsonc` (or `memos.jsonc` for backwards compatibility):
 
 ```jsonc
 {

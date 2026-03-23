@@ -5,6 +5,8 @@ import { stripJsoncComments } from "./services/jsonc.js";
 
 const CONFIG_DIR = join(homedir(), ".config", "opencode");
 const CONFIG_FILES = [
+  join(CONFIG_DIR, "mem-os.jsonc"),
+  join(CONFIG_DIR, "mem-os.json"),
   join(CONFIG_DIR, "memos.jsonc"),
   join(CONFIG_DIR, "memos.json"),
 ];
@@ -111,22 +113,22 @@ const projectConfig = findProjectConfig();
 
 function getApiKey(): string | undefined {
   if (projectConfig.apiKey) return projectConfig.apiKey;
-  if (process.env.MEMOS_API_KEY) return process.env.MEMOS_API_KEY;
   if (fileConfig.apiKey) return fileConfig.apiKey;
+  if (process.env.MEMOS_API_KEY) return process.env.MEMOS_API_KEY;
   return undefined;
 }
 
 function getUserId(): string | undefined {
   if (projectConfig.userId) return projectConfig.userId;
-  if (process.env.MEMOS_USER_ID) return process.env.MEMOS_USER_ID;
   if (fileConfig.userId) return fileConfig.userId;
+  if (process.env.MEMOS_USER_ID) return process.env.MEMOS_USER_ID;
   return undefined;
 }
 
 function getChannel(): string | undefined {
   if (projectConfig.channel) return projectConfig.channel;
-  if (process.env.MEMOS_CHANNEL) return process.env.MEMOS_CHANNEL;
   if (fileConfig.channel) return fileConfig.channel;
+  if (process.env.MEMOS_CHANNEL) return process.env.MEMOS_CHANNEL;
   return undefined;
 }
 
@@ -135,22 +137,22 @@ export const MEMOS_USER_ID = getUserId();
 export const MEMOS_CHANNEL = getChannel();
 
 export const CONFIG = {
-  baseUrl: fileConfig.baseUrl ?? DEFAULTS.baseUrl,
-  similarityThreshold: fileConfig.similarityThreshold ?? DEFAULTS.similarityThreshold,
-  maxMemories: fileConfig.maxMemories ?? DEFAULTS.maxMemories,
-  maxProfileItems: fileConfig.maxProfileItems ?? DEFAULTS.maxProfileItems,
-  injectProfile: fileConfig.injectProfile ?? DEFAULTS.injectProfile,
+  baseUrl: projectConfig.baseUrl ?? fileConfig.baseUrl ?? DEFAULTS.baseUrl,
+  similarityThreshold: projectConfig.similarityThreshold ?? fileConfig.similarityThreshold ?? DEFAULTS.similarityThreshold,
+  maxMemories: projectConfig.maxMemories ?? fileConfig.maxMemories ?? DEFAULTS.maxMemories,
+  maxProfileItems: projectConfig.maxProfileItems ?? fileConfig.maxProfileItems ?? DEFAULTS.maxProfileItems,
+  injectProfile: projectConfig.injectProfile ?? fileConfig.injectProfile ?? DEFAULTS.injectProfile,
   keywordPatterns: [
     ...DEFAULT_KEYWORD_PATTERNS,
-    ...(fileConfig.keywordPatterns ?? []).filter(isValidRegex),
+    ...(projectConfig.keywordPatterns ?? fileConfig.keywordPatterns ?? []).filter(isValidRegex),
   ],
-  compactionThreshold: fileConfig.compactionThreshold ?? DEFAULTS.compactionThreshold,
-  minTokensForCompaction: fileConfig.minTokensForCompaction ?? DEFAULTS.minTokensForCompaction,
-  compactionCooldownSeconds: fileConfig.compactionCooldownSeconds ?? DEFAULTS.compactionCooldownSeconds,
-  containerTagPrefix: fileConfig.containerTagPrefix ?? DEFAULTS.containerTagPrefix,
-  userContainerTag: fileConfig.userContainerTag,
-  projectContainerTag: fileConfig.projectContainerTag,
-  maxProjectMemories: fileConfig.maxProjectMemories ?? DEFAULTS.maxProjectMemories,
+  compactionThreshold: projectConfig.compactionThreshold ?? fileConfig.compactionThreshold ?? DEFAULTS.compactionThreshold,
+  minTokensForCompaction: projectConfig.minTokensForCompaction ?? fileConfig.minTokensForCompaction ?? DEFAULTS.minTokensForCompaction,
+  compactionCooldownSeconds: projectConfig.compactionCooldownSeconds ?? fileConfig.compactionCooldownSeconds ?? DEFAULTS.compactionCooldownSeconds,
+  containerTagPrefix: projectConfig.containerTagPrefix ?? fileConfig.containerTagPrefix ?? DEFAULTS.containerTagPrefix,
+  userContainerTag: projectConfig.userContainerTag ?? fileConfig.userContainerTag,
+  projectContainerTag: projectConfig.projectContainerTag ?? fileConfig.projectContainerTag,
+  maxProjectMemories: projectConfig.maxProjectMemories ?? fileConfig.maxProjectMemories ?? DEFAULTS.maxProjectMemories,
 };
 
 export function isConfigured(): boolean {
