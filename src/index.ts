@@ -181,6 +181,18 @@ export const MemOSPlugin: Plugin = async (ctx: PluginInput) => {
             return;
           }
 
+          const firstMessage = messages[0]!;
+          const sessionID = firstMessage.info?.sessionID;
+          if (!sessionID) return;
+
+          // 避免重复查询：只在首次消息时查询
+          if (!injectedSessions.has(sessionID)) {
+            injectedSessions.add(sessionID);
+          } else {
+            log("experimental.chat.messages.transform: session already injected, skipping");
+            return;
+          }
+
           const lastUserMessageIdx = [...messages].reverse().findIndex(
             (m) => m.info?.role === "user"
           );
@@ -190,7 +202,6 @@ export const MemOSPlugin: Plugin = async (ctx: PluginInput) => {
           }
           const userMsgIdx = messages.length - 1 - lastUserMessageIdx;
           const userMessage = messages[userMsgIdx]!;
-          const firstMessage = messages[0]!;
 
           const textParts = userMessage.parts.filter(
             (p): p is Part & { type: "text"; text: string } => p.type === "text"
@@ -203,8 +214,7 @@ export const MemOSPlugin: Plugin = async (ctx: PluginInput) => {
           const userText = textParts.map((p) => p.text).join("\n");
           const queryForSearch = userText.slice(0, MAX_QUERY_LENGTH);
 
-          const sessionID = firstMessage.info?.sessionID;
-          const tags = getTags(sessionID || "");
+          const tags = getTags(sessionID);
           const { conversationId } = tags;
 
           log("experimental.chat.messages.transform: searching memories", {

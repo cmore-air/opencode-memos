@@ -13443,6 +13443,16 @@ var MemOSPlugin = async (ctx) => {
             log("experimental.chat.messages.transform: no messages");
             return;
           }
+          const firstMessage = messages[0];
+          const sessionID = firstMessage.info?.sessionID;
+          if (!sessionID)
+            return;
+          if (!injectedSessions.has(sessionID)) {
+            injectedSessions.add(sessionID);
+          } else {
+            log("experimental.chat.messages.transform: session already injected, skipping");
+            return;
+          }
           const lastUserMessageIdx = [...messages].reverse().findIndex((m) => m.info?.role === "user");
           if (lastUserMessageIdx === -1) {
             log("experimental.chat.messages.transform: no user message found");
@@ -13450,7 +13460,6 @@ var MemOSPlugin = async (ctx) => {
           }
           const userMsgIdx = messages.length - 1 - lastUserMessageIdx;
           const userMessage = messages[userMsgIdx];
-          const firstMessage = messages[0];
           const textParts = userMessage.parts.filter((p) => p.type === "text");
           if (textParts.length === 0) {
             log("experimental.chat.messages.transform: no text parts in user message");
@@ -13459,8 +13468,7 @@ var MemOSPlugin = async (ctx) => {
           const userText = textParts.map((p) => p.text).join(`
 `);
           const queryForSearch = userText.slice(0, MAX_QUERY_LENGTH);
-          const sessionID = firstMessage.info?.sessionID;
-          const tags2 = getTags(sessionID || "");
+          const tags2 = getTags(sessionID);
           const { conversationId } = tags2;
           log("experimental.chat.messages.transform: searching memories", {
             queryPreview: queryForSearch.slice(0, 100),
