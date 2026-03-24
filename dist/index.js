@@ -13298,14 +13298,6 @@ var CODE_BLOCK_PATTERN = /```[\s\S]*?```/g;
 var INLINE_CODE_PATTERN = /`[^`]+`/g;
 var MAX_QUERY_LENGTH = 500;
 var MAX_CONTEXT_LENGTH = 2000;
-var MEMORY_KEYWORD_PATTERN;
-try {
-  const patterns = CONFIG.keywordPatterns || [];
-  MEMORY_KEYWORD_PATTERN = new RegExp(`\\b(${patterns.join("|")})\\b`, "i");
-} catch (e) {
-  log("Failed to initialize MEMORY_KEYWORD_PATTERN, using default", { error: String(e) });
-  MEMORY_KEYWORD_PATTERN = new RegExp(`\\b(remember|memorize|save\\s+this)\\b`, "i");
-}
 var MEMORY_NUDGE_MESSAGE = `[MEMORY TRIGGER DETECTED]
 The user wants you to remember something. You MUST use the \`mem-os\` tool with \`mode: "add"\` to save this information.
 
@@ -13317,7 +13309,8 @@ function removeCodeBlocks(text) {
 }
 function detectMemoryKeyword(text) {
   const textWithoutCode = removeCodeBlocks(text);
-  return MEMORY_KEYWORD_PATTERN.test(textWithoutCode);
+  const patterns = CONFIG.keywordPatterns || [];
+  return patterns.some((pattern) => textWithoutCode.includes(pattern));
 }
 var MemOSPlugin = async (ctx) => {
   try {
