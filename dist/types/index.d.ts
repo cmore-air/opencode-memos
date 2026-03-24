@@ -189,6 +189,7 @@ export interface MemoryFilterOptions {
     preference_types?: PreferenceType[];
     min_confidence?: number;
     tags?: string[];
+    knowledgebase_ids?: string[];
 }
 export interface MemCubeOptions {
     readable_cube_ids?: string[];

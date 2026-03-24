@@ -106,7 +106,11 @@ export class MemOSClient {
     conversationId?: string,
     options?: MemoryFilterOptions
   ): Promise<MemOSClientResponse<SearchMemoryResponse>> {
-    log("MemOSClient.searchMemory: start", { query, conversationId });
+    log("MemOSClient.searchMemory: start", { 
+      query, 
+      conversationId,
+      knowledgebaseIds: options?.knowledgebase_ids,
+    });
     const body: Record<string, unknown> = {
       query,
       conversation_id: conversationId,

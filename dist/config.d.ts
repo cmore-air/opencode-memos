@@ -18,6 +18,7 @@ export declare const CONFIG: {
     readableCubeIds: string[];
     writableCubeIds: string[];
     defaultAddMode: "fast" | "fine";
+    knowledgebaseIds: string[];
 };
 export declare function isConfigured(): boolean;
 //# sourceMappingURL=config.d.ts.map

@@ -124,6 +124,18 @@ Additional settings available in config file:
 | `readableCubeIds` | `[]` | Default cubes to search from |
 | `writableCubeIds` | `[]` | Default cubes to write to |
 | `defaultAddMode` | `"fine"` | Default add mode (`fast` or `fine`) |
+| `knowledgebaseIds` | `[]` | Knowledge base IDs to search (supports merge from project + global config) |
+
+### Knowledge Base Search
+
+When `knowledgebaseIds` is configured, the plugin will automatically search your knowledge bases along with memories on every user message.
+
+**Merge behavior**: If both project config and global config define knowledgebase IDs, they will be merged (deduplicated) before sending to the API.
+
+**Example**:
+- Project config (`mem-os.jsonc`): `knowledgebaseIds: ["kb_project_001"]`
+- Global config (`~/.config/opencode/mem-os.jsonc`): `knowledgebaseIds: ["kb_global_001", "kb_global_002"]`
+- **Result**: `["kb_project_001", "kb_global_001", "kb_global_002"]` (all IDs will be searched)
 
 ## Initialize Codebase
 
@@ -143,7 +155,8 @@ Create `mem-os.jsonc`, `mem-os.json`, `.mem-os.jsonc`, or `.mem-os.json` in your
 {
   "apiKey": "your_api_key",
   "userId": "your_user_id",
-  "channel": "your_channel"
+  "channel": "your_channel",
+  "knowledgebaseIds": ["kb_xxx", "kb_yyy"]
 }
 ```
 

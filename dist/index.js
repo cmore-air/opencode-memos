@@ -12541,7 +12541,8 @@ var DEFAULTS = {
   debug: false,
   readableCubeIds: [],
   writableCubeIds: [],
-  defaultAddMode: "fine"
+  defaultAddMode: "fine",
+  knowledgebaseIds: []
 };
 function isValidRegex(pattern) {
   try {
@@ -12663,7 +12664,13 @@ var CONFIG = {
   maxProjectMemories: projectConfig.maxProjectMemories ?? fileConfig.maxProjectMemories ?? DEFAULTS.maxProjectMemories,
   readableCubeIds: projectConfig.readableCubeIds ?? fileConfig.readableCubeIds ?? DEFAULTS.readableCubeIds,
   writableCubeIds: projectConfig.writableCubeIds ?? fileConfig.writableCubeIds ?? DEFAULTS.writableCubeIds,
-  defaultAddMode: projectConfig.defaultAddMode ?? fileConfig.defaultAddMode ?? DEFAULTS.defaultAddMode
+  defaultAddMode: projectConfig.defaultAddMode ?? fileConfig.defaultAddMode ?? DEFAULTS.defaultAddMode,
+  knowledgebaseIds: [
+    ...new Set([
+      ...projectConfig.knowledgebaseIds ?? [],
+      ...fileConfig.knowledgebaseIds ?? []
+    ])
+  ]
 };
 if (debugEnabled) {
   debug("Final CONFIG applied", CONFIG);
@@ -12730,7 +12737,11 @@ class MemOSClient {
     return memOSFetch("/add/message", request);
   }
   async searchMemory(query, conversationId, options) {
-    log("MemOSClient.searchMemory: start", { query, conversationId });
+    log("MemOSClient.searchMemory: start", {
+      query,
+      conversationId,
+      knowledgebaseIds: options?.knowledgebase_ids
+    });
     const body = {
       query,
       conversation_id: conversationId,
@@ -13398,7 +13409,8 @@ var MemOSPlugin = async (ctx) => {
             const sessionID = input.sessionID;
             const { conversationId } = getTags(sessionID);
             const queryForSearch = userMessage.slice(0, MAX_QUERY_LENGTH);
-            const searchResult = await memOSClient.searchMemory(queryForSearch, conversationId);
+            const searchOptions = CONFIG.knowledgebaseIds.length > 0 ? { knowledgebase_ids: CONFIG.knowledgebaseIds } : undefined;
+            const searchResult = await memOSClient.searchMemory(queryForSearch, conversationId, searchOptions);
             const memoryContext = formatContextForPrompt(searchResult.success && searchResult.data ? searchResult.data : null);
             if (memoryContext) {
               const truncatedContext = memoryContext.slice(0, MAX_CONTEXT_LENGTH);
@@ -13472,9 +13484,11 @@ var MemOSPlugin = async (ctx) => {
           const { conversationId } = tags2;
           log("experimental.chat.messages.transform: searching memories", {
             queryPreview: queryForSearch.slice(0, 100),
-            conversationId
+            conversationId,
+            knowledgebaseIds: CONFIG.knowledgebaseIds
           });
-          const searchResult = await memOSClient.searchMemory(queryForSearch, conversationId);
+          const searchOptions = CONFIG.knowledgebaseIds.length > 0 ? { knowledgebase_ids: CONFIG.knowledgebaseIds } : undefined;
+          const searchResult = await memOSClient.searchMemory(queryForSearch, conversationId, searchOptions);
           const memoryContext = formatContextForPrompt(searchResult.success && searchResult.data ? searchResult.data : null);
           if (!memoryContext) {
             log("experimental.chat.messages.transform: no memory context found");

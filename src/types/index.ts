@@ -223,6 +223,7 @@ export interface MemoryFilterOptions {
   preference_types?: PreferenceType[]; // 按偏好类型过滤
   min_confidence?: number;             // 最小置信度阈值 (0-1)
   tags?: string[];                     // 按标签过滤
+  knowledgebase_ids?: string[];       // 知识库 ID 列表
 }
 
 // ============================================

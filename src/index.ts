@@ -128,7 +128,10 @@ export const MemOSPlugin: Plugin = async (ctx: PluginInput) => {
             const { conversationId } = getTags(sessionID);
 
             const queryForSearch = userMessage.slice(0, MAX_QUERY_LENGTH);
-            const searchResult = await memOSClient.searchMemory(queryForSearch, conversationId);
+            const searchOptions = CONFIG.knowledgebaseIds.length > 0
+              ? { knowledgebase_ids: CONFIG.knowledgebaseIds }
+              : undefined;
+            const searchResult = await memOSClient.searchMemory(queryForSearch, conversationId, searchOptions);
 
             const memoryContext = formatContextForPrompt(searchResult.success && searchResult.data ? searchResult.data : null);
 
@@ -220,9 +223,13 @@ export const MemOSPlugin: Plugin = async (ctx: PluginInput) => {
           log("experimental.chat.messages.transform: searching memories", {
             queryPreview: queryForSearch.slice(0, 100),
             conversationId,
+            knowledgebaseIds: CONFIG.knowledgebaseIds,
           });
 
-          const searchResult = await memOSClient.searchMemory(queryForSearch, conversationId);
+          const searchOptions = CONFIG.knowledgebaseIds.length > 0
+            ? { knowledgebase_ids: CONFIG.knowledgebaseIds }
+            : undefined;
+          const searchResult = await memOSClient.searchMemory(queryForSearch, conversationId, searchOptions);
           const memoryContext = formatContextForPrompt(
             searchResult.success && searchResult.data ? searchResult.data : null
           );

@@ -40,6 +40,7 @@ interface MemOSConfig {
   readableCubeIds?: string[];
   writableCubeIds?: string[];
   defaultAddMode?: "fast" | "fine";
+  knowledgebaseIds?: string[];  // 知识库 ID 列表
 }
 
 const DEFAULT_KEYWORD_PATTERNS = [
@@ -91,6 +92,7 @@ const DEFAULTS: Required<Omit<MemOSConfig, "apiKey" | "userId" | "channel">> = {
   readableCubeIds: [],
   writableCubeIds: [],
   defaultAddMode: "fine",
+  knowledgebaseIds: [],
 };
 
 function isValidRegex(pattern: string): boolean {
@@ -225,6 +227,13 @@ export const CONFIG = {
   readableCubeIds: projectConfig.readableCubeIds ?? fileConfig.readableCubeIds ?? DEFAULTS.readableCubeIds,
   writableCubeIds: projectConfig.writableCubeIds ?? fileConfig.writableCubeIds ?? DEFAULTS.writableCubeIds,
   defaultAddMode: projectConfig.defaultAddMode ?? fileConfig.defaultAddMode ?? DEFAULTS.defaultAddMode,
+  // 合并项目级和全局级的知识库 ID（去重）
+  knowledgebaseIds: [
+    ...new Set([
+      ...(projectConfig.knowledgebaseIds ?? []),
+      ...(fileConfig.knowledgebaseIds ?? []),
+    ]),
+  ],
 };
 
 if (debugEnabled) {
