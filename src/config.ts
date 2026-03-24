@@ -43,6 +43,7 @@ interface MemOSConfig {
 }
 
 const DEFAULT_KEYWORD_PATTERNS = [
+  // English
   "remember",
   "memorize",
   "save\\s+this",
@@ -59,6 +60,17 @@ const DEFAULT_KEYWORD_PATTERNS = [
   "remember\\s+that",
   "never\\s+forget",
   "always\\s+remember",
+  // Chinese
+  "记住",
+  "记一下",
+  "记着",
+  "别忘了",
+  "添加到记忆",
+  "存入记忆",
+  "添加记忆",
+  "收藏",
+  "缓存",
+  "暂存",
 ];
 
 const DEFAULTS: Required<Omit<MemOSConfig, "apiKey" | "userId" | "channel">> = {

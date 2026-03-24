@@ -12512,7 +12512,17 @@ var DEFAULT_KEYWORD_PATTERNS = [
   "commit\\s+to\\s+memory",
   "remember\\s+that",
   "never\\s+forget",
-  "always\\s+remember"
+  "always\\s+remember",
+  "记住",
+  "记一下",
+  "记着",
+  "别忘了",
+  "添加到记忆",
+  "存入记忆",
+  "添加记忆",
+  "收藏",
+  "缓存",
+  "暂存"
 ];
 var DEFAULTS = {
   baseUrl: "https://memos.memtensor.cn/api/openmem/v1",
